@@ -5,6 +5,8 @@ import com.scaleplex.core.model.ScaleBrand
 import com.scaleplex.core.model.ScaleDevice
 import com.scaleplex.core.model.CommType
 import com.scaleplex.core.model.SerialParams
+import com.scaleplex.core.model.TradeRecord
+import com.scaleplex.core.util.Numbers
 import org.apache.poi.ss.usermodel.Cell
 import org.apache.poi.ss.usermodel.Row
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
@@ -150,6 +152,35 @@ object ImportExportService {
         val sample = PluItem(pluNo = 1, name = "示例商品", nameEn = "Sample", unitPrice = 999,
             mainGroup = 997, weightFlag = 0, eanCode = "2000000000000")
         exportPluXlsx(file, listOf(sample))
+    }
+
+    // ---------------- Trade log Excel ----------------
+    private val TRADE_HEADER = listOf(
+        "Time", "PLU_No", "Name", "Weight", "Unit_Price", "Amount", "Operator",
+    )
+
+    /** 流水 Excel 导出：时间 / PLU / 品名 / 重量 / 单价 / 金额 / 操作员。 */
+    fun exportTradeLogXlsx(
+        file: File,
+        records: List<TradeRecord>,
+        priceDecimals: Int = 2,
+        weightDecimals: Int = 3,
+    ) {
+        XSSFWorkbook().use { wb ->
+            val sheet = wb.createSheet("Trades")
+            TRADE_HEADER.forEachIndexed { i, t -> sheet.createRow(0).createCell(i).setCellValue(t) }
+            records.forEachIndexed { r, t ->
+                val row = sheet.createRow(r + 1)
+                row.cell(0).setCellValue(t.timestamp?.toString() ?: "")
+                row.cell(1).setCellValue(t.pluNo.toDouble())
+                row.cell(2).setCellValue(t.pluName)
+                row.cell(3).setCellValue(Numbers.weightToDisplay(t.weight, weightDecimals))
+                row.cell(4).setCellValue(Numbers.minorToDisplay(t.unitPrice, priceDecimals))
+                row.cell(5).setCellValue(Numbers.minorToDisplay(t.amount, priceDecimals))
+                row.cell(6).setCellValue(t.operator)
+            }
+            FileOutputStream(file).use { wb.write(it) }
+        }
     }
 
     // ---------------- helpers ----------------

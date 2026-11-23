@@ -5,6 +5,7 @@ dependencies {
     implementation(project(":communication"))
     implementation(project(":driver-impl"))
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.datetime)
     implementation(libs.slf4j.api)
     implementation(libs.poi)
     implementation(libs.poi.ooxml)

@@ -12,18 +12,38 @@ import androidx.compose.ui.unit.sp
 import com.scaleplex.app.AppState
 import com.scaleplex.core.i18n.tr
 import com.scaleplex.core.util.Numbers
+import com.scaleplex.service.io.ImportExportService
 import kotlinx.coroutines.launch
+import java.io.File
+import javax.swing.JFileChooser
 
-/** Transaction log panel: read from scales, query, export. */
+/**
+ * 交易流水面板：按设备 / 起止日期 / PLU 号筛选查询、读取秤内流水、清空、导出 Excel。
+ */
 @Composable
 fun TradePanel(state: AppState, refresh: MutableState<Int>) {
-    var records by remember(refresh.value) {
-        mutableStateOf(state.tradeLogService.query(page = 0, pageSize = 200))
+    var filterDevice by remember { mutableStateOf<Long?>(null) }
+    var filterFrom by remember { mutableStateOf("") }
+    var filterTo by remember { mutableStateOf("") }
+    var filterPlu by remember { mutableStateOf("") }
+
+    var records by remember(refresh.value, filterDevice, filterFrom, filterTo, filterPlu) {
+        mutableStateOf(
+            state.tradeLogService.query(
+                deviceId = filterDevice,
+                from = filterFrom.ifBlank { null },
+                to = filterTo.ifBlank { null },
+                pluNo = filterPlu.toIntOrNull(),
+                page = 0,
+                pageSize = 500,
+            )
+        )
     }
     val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        // ---- 工具栏：读取 / 清空 ----
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(tr("tab.trade"), Modifier.weight(1f), fontSize = 18.sp)
             Button(onClick = {
                 scope.launch {
@@ -31,13 +51,57 @@ fun TradePanel(state: AppState, refresh: MutableState<Int>) {
                         val res = state.scaleService.driverFor(dev).readTradeLog()
                         res.getOrNull()?.let { state.tradeLogService.store(dev.id, it) }
                     }
-                    records = state.tradeLogService.query(pageSize = 200)
+                    records = state.tradeLogService.query(pageSize = 500)
                 }
             }) { Text(tr("trade.read")) }
             Spacer(Modifier.width(8.dp))
             Button(onClick = { state.tradeLogService.clearAll(); records = emptyList() }) { Text(tr("trade.clear")) }
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = {
+                val chooser = JFileChooser()
+                chooser.selectedFile = File("trade_log.xlsx")
+                if (chooser.showSaveDialog(null) == JFileChooser.APPROVE_OPTION) {
+                    ImportExportService.exportTradeLogXlsx(
+                        chooser.selectedFile,
+                        records,
+                        state.config.priceDecimals,
+                        state.config.weightDecimals,
+                    )
+                }
+            }) { Text(tr("trade.export")) }
         }
 
+        // ---- 筛选行 ----
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            var deviceExpanded by remember { mutableStateOf(false) }
+            val devices = state.scaleService.devices()
+            OutlinedTextField(
+                value = devices.firstOrNull { it.id == filterDevice }?.name ?: tr("trade.filter.device"),
+                onValueChange = {}, readOnly = true, label = { Text(tr("trade.filter.device")) },
+                modifier = Modifier.width(150.dp),
+                trailingIcon = { TextButton(onClick = { deviceExpanded = true }) { Text("▾") } },
+            )
+            DropdownMenu(deviceExpanded, { deviceExpanded = false }) {
+                DropdownMenuItem(onClick = { filterDevice = null; deviceExpanded = false }) { Text(tr("trade.filter.device")) }
+                devices.forEach { d ->
+                    DropdownMenuItem(onClick = { filterDevice = d.id; deviceExpanded = false }) { Text(d.name) }
+                }
+            }
+            OutlinedTextField(
+                filterFrom, { filterFrom = it },
+                label = { Text(tr("trade.filter.from")) }, modifier = Modifier.width(140.dp),
+            )
+            OutlinedTextField(
+                filterTo, { filterTo = it },
+                label = { Text(tr("trade.filter.to")) }, modifier = Modifier.width(140.dp),
+            )
+            OutlinedTextField(
+                filterPlu, { filterPlu = it },
+                label = { Text(tr("trade.field.plu")) }, modifier = Modifier.width(110.dp),
+            )
+        }
+
+        // ---- 表头 ----
         Row(modifier = Modifier.fillMaxWidth().padding(4.dp)) {
             Text(tr("trade.field.time"), Modifier.width(150.dp), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
             Text(tr("trade.field.plu"), Modifier.width(70.dp), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
