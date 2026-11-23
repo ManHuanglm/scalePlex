@@ -1,0 +1,73 @@
+<html>
+<body>
+<pre>
+<h1>Build Log</h1>
+<h3>
+--------------------Configuration: vcDemo - Win32 Release--------------------
+</h3>
+<h3>Command Lines</h3>
+Creating command line "rc.exe /l 0x804 /fo"Release/vcDemo.res" /d "NDEBUG" /d "_AFXDLL" "E:\2009\09.12\12.26 Tiger\上海大华电子秤接口\vcDemo\vcDemo.rc"" 
+Creating temporary file "C:\DOCUME~1\roy\LOCALS~1\Temp\RSP6A0.tmp" with contents
+[
+/nologo /MD /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_AFXDLL" /D "_MBCS" /Fp"Release/vcDemo.pch" /Yu"stdafx.h" /Fo"Release/" /Fd"Release/" /FD /c 
+"E:\2009\09.12\12.26 Tiger\上海大华电子秤接口\vcDemo\vcDemo.cpp"
+"E:\2009\09.12\12.26 Tiger\上海大华电子秤接口\vcDemo\vcDemoDlg.cpp"
+]
+Creating command line "cl.exe @C:\DOCUME~1\roy\LOCALS~1\Temp\RSP6A0.tmp" 
+Creating temporary file "C:\DOCUME~1\roy\LOCALS~1\Temp\RSP6A1.tmp" with contents
+[
+/nologo /MD /W3 /GX /O2 /D "WIN32" /D "NDEBUG" /D "_WINDOWS" /D "_AFXDLL" /D "_MBCS" /Fp"Release/vcDemo.pch" /Yc"stdafx.h" /Fo"Release/" /Fd"Release/" /FD /c 
+"E:\2009\09.12\12.26 Tiger\上海大华电子秤接口\vcDemo\StdAfx.cpp"
+]
+Creating command line "cl.exe @C:\DOCUME~1\roy\LOCALS~1\Temp\RSP6A1.tmp" 
+Creating command line "link.exe /nologo /subsystem:windows /incremental:no /pdb:"Release/vcDemo.pdb" /machine:I386 /out:"Release/vcDemo.exe"  ".\Release\vcDemo.obj" ".\Release\vcDemoDlg.obj" ".\Release\StdAfx.obj" ".\Release\vcDemo.res" ".\DhScalePluNet.lib" "
+<h3>Output Window</h3>
+Compiling resources...
+Compiling...
+StdAfx.cpp
+Compiling...
+vcDemo.cpp
+vcDemoDlg.cpp
+Generating Code...
+Linking...
+
+
+
+<h3>Results</h3>
+vcDemo.exe - 0 error(s), 0 warning(s)
+<h3>
+--------------------Configuration: vcDemo - Win32 Debug--------------------
+</h3>
+<h3>Command Lines</h3>
+Creating command line "rc.exe /l 0x804 /fo"Debug/vcDemo.res" /d "_DEBUG" /d "_AFXDLL" "E:\2009\09.12\12.26 Tiger\上海大华电子秤接口\vcDemo\vcDemo.rc"" 
+Creating temporary file "C:\DOCUME~1\roy\LOCALS~1\Temp\RSP6A3.tmp" with contents
+[
+/nologo /MDd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_AFXDLL" /D "_MBCS" /Fp"Debug/vcDemo.pch" /Yu"stdafx.h" /Fo"Debug/" /Fd"Debug/" /FD /GZ   /c 
+"E:\2009\09.12\12.26 Tiger\上海大华电子秤接口\vcDemo\vcDemo.cpp"
+"E:\2009\09.12\12.26 Tiger\上海大华电子秤接口\vcDemo\vcDemoDlg.cpp"
+]
+Creating command line "cl.exe @C:\DOCUME~1\roy\LOCALS~1\Temp\RSP6A3.tmp" 
+Creating temporary file "C:\DOCUME~1\roy\LOCALS~1\Temp\RSP6A4.tmp" with contents
+[
+/nologo /MDd /W3 /Gm /GX /ZI /Od /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "_AFXDLL" /D "_MBCS" /Fp"Debug/vcDemo.pch" /Yc"stdafx.h" /Fo"Debug/" /Fd"Debug/" /FD /GZ   /c 
+"E:\2009\09.12\12.26 Tiger\上海大华电子秤接口\vcDemo\StdAfx.cpp"
+]
+Creating command line "cl.exe @C:\DOCUME~1\roy\LOCALS~1\Temp\RSP6A4.tmp" 
+Creating command line "link.exe /nologo /subsystem:windows /incremental:yes /pdb:"Debug/vcDemo.pdb" /debug /machine:I386 /out:"Debug/vcDemo.exe" /pdbtype:sept  ".\Debug\vcDemo.obj" ".\Debug\vcDemoDlg.obj" ".\Debug\StdAfx.obj" ".\Debug\vcDemo.res" ".\DhScalePluNet.lib" "
+<h3>Output Window</h3>
+Compiling resources...
+Compiling...
+StdAfx.cpp
+Compiling...
+vcDemo.cpp
+vcDemoDlg.cpp
+Generating Code...
+Linking...
+
+
+
+<h3>Results</h3>
+vcDemo.exe - 0 error(s), 0 warning(s)
+</pre>
+</body>
+</html>

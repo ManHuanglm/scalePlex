@@ -65,4 +65,6 @@ data class ScaleConfig(
     val mtApiDllPath: String = "",
     /** 寺冈工具目录（TWS.exe/SMScale.dll/SM.ini/Desc），DIGI 驱动桥接调用。 */
     val digiToolsPath: String = "",
+    /** 大华工具目录（DhScalePluNet.dll 所在），大华驱动桥接调用。 */
+    val dahuaToolsPath: String = "",
 )

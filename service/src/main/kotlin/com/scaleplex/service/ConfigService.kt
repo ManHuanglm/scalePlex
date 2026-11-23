@@ -34,13 +34,17 @@ class ConfigService(db: Database) {
             barcodeFormat = (g("barcodeFormat", "0")).toIntOrNull() ?: 0,
             mtApiDllPath = g("mtApiDllPath", ""),
             digiToolsPath = g("digiToolsPath", ""),
+            dahuaToolsPath = g("dahuaToolsPath", ""),
         )
-        // 启动时同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS）
+        // 启动时同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS / 大华 DhScalePluNet）
         if (config.mtApiDllPath.isNotBlank()) {
             System.setProperty("scaleplex.mt.dll", config.mtApiDllPath)
         }
         if (config.digiToolsPath.isNotBlank()) {
             System.setProperty("scaleplex.digi.tools", config.digiToolsPath)
+        }
+        if (config.dahuaToolsPath.isNotBlank()) {
+            System.setProperty("scaleplex.dahua.tools", config.dahuaToolsPath)
         }
         return config
     }
@@ -62,12 +66,16 @@ class ConfigService(db: Database) {
         dao.put("barcodeFormat", cfg.barcodeFormat.toString())
         dao.put("mtApiDllPath", cfg.mtApiDllPath)
         dao.put("digiToolsPath", cfg.digiToolsPath)
-        // 同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS）
+        dao.put("dahuaToolsPath", cfg.dahuaToolsPath)
+        // 同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS / 大华 DhScalePluNet）
         if (cfg.mtApiDllPath.isNotBlank()) {
             System.setProperty("scaleplex.mt.dll", cfg.mtApiDllPath)
         }
         if (cfg.digiToolsPath.isNotBlank()) {
             System.setProperty("scaleplex.digi.tools", cfg.digiToolsPath)
+        }
+        if (cfg.dahuaToolsPath.isNotBlank()) {
+            System.setProperty("scaleplex.dahua.tools", cfg.dahuaToolsPath)
         }
         applyLocale(cfg.language)
     }

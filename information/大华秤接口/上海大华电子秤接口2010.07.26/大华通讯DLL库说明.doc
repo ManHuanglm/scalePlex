@@ -1,0 +1,62 @@
+{\rtf1\ansi\ansicpg936\deff0\deflang1033\deftab420{\fonttbl{\f0\fnil\fprq2\fcharset134 \'cb\'ce\'cc\'e5;}{\f1\froman\fcharset0 Times New Roman;}{\f2\fnil\fcharset134 \'cb\'ce\'cc\'e5;}}
+{\*\generator Msftedit 5.41.15.1515;}\viewkind4\uc1\pard\nowidctlpar\fi420\li2520\qj\lang2052\kerning2\f0\fs21\tab\tab\lang1033\f1 DhScalePluNet.dll\lang2052\f2\'cb\'b5\'c3\'f7\lang1033\f1 :\par
+\pard\nowidctlpar\qj\par
+\lang2052\f2\'ca\'e4\'b3\'f6\'ba\'af\'ca\'fd\'a3\'ba\lang1033\f1\par
+\tab dhSendPluDefault\par
+\tab dhRcvRdDefault\par
+\pard\nowidctlpar\fi420\qj\lang2052\f2\'d6\'a7\'b3\'d6\lang1033\f1 VB , VC , DELPHI , VFP\lang2052\f2\'b5\'c8\'b1\'e0\'d2\'eb\'bb\'b7\'be\'b3\'b5\'c4\'b5\'f7\'d3\'c3\lang1033\f1\par
+\pard\nowidctlpar\qj\tab\par
+\tab int\tab dhSendPluDefault ();\par
+\tab dhSendPluDefault :\lang2052\f2\'ba\'af\'ca\'fd\'ba\'cd\'b8\'bd\'b4\'f8\'b5\'c4\lang1033\f1 Dhset.exe\lang2052\f2\'c9\'e8\'d6\'c3\'c6\'f7\'d2\'bb\'c6\'f0\'ca\'b9\'d3\'c3\lang1033\f1 ;\par
+\tab\lang2052\f2\'be\'df\'cc\'e5\'b7\'bd\'b7\'a8\'ca\'c7\lang1033\f1 :\tab\lang2052\f2\'c5\'e4\'d6\'c3\lang1033\f1 dhip.ini ,\tab dhplupathname.ini ,\tab dhpluversion.ini\tab 3\lang2052\f2\'b8\'f6\lang1033\f1 ini\lang2052\f2\'ce\'c4\'bc\'fe\lang1033\f1 ,\lang2052\f2\'c6\'e4\'d6\'d0\lang1033\f1 dhip.ini\lang2052\f2\'b4\'e6\'b7\'c5\'b5\'c4\'ca\'c7\'cd\'f8\'c2\'e7\'bb\'b7\'be\'b3\'d0\'c5\'cf\'a2\lang1033\f1 , dhplupathname.ini\lang2052\f2\'b4\'e6\'b7\'c5\'b5\'c4\'ca\'c7\'c4\'fa\'d2\'aa\'c9\'fa\'b3\'c9\'c4\'bf\'b1\'ea\lang1033\f1 PLU\lang2052\f2\'ce\'c4\'bc\'fe\'b5\'c4\'d4\'b4\lang1033\f1 PLU\lang2052\f2\'ce\'c4\'bc\'fe\'b5\'c4\'c2\'b7\'be\'b6\'c3\'fb\lang1033\f1 ;\tab dhpluversion.ini\lang2052\f2\'b4\'e6\'b7\'c5\'b5\'c4\'ca\'c7\'d4\'b4\lang1033\f1 PLU\lang2052\f2\'ce\'c4\'bc\'fe\'b5\'c4\'b0\'e6\'b1\'be\'ba\'cd\'ba\'af\'ca\'fd\lang1033\f1 2\lang2052\f2\'b5\'c4\'b0\'e6\'b1\'be\'b6\'a8\'d2\'e5\'d2\'bb\'d6\'c2\lang1033\f1 .\par
+\lang2052\f2\tab\ldblquote\lang1033\f1 dhip.ini\lang2052\f2\rdblquote\lang1033\f1  ,\lang2052\f2\ldblquote\lang1033\f1 dhplupathname.ini\lang2052\f2\rdblquote\lang1033\f1  ,\tab\lang2052\f2\ldblquote\lang1033\f1 dhpluversion.ini\lang2052\f2\rdblquote\lang1033\f1  \lang2052\f2\'d5\'e2\lang1033\f1 3\lang2052\f2\'b8\'f6\'c9\'e8\'d6\'c3\'ce\'c4\'bc\'fe\'cb\'b5\'c3\'f7\'a3\'ba\lang1033\f1\par
+\par
+\pard\nowidctlpar\fi420\qj\lang2052\f2\ldblquote\lang1033\f1 dhip.ini\lang2052\f2\rdblquote\'b4\'e6\'b7\'c5\'b5\'c4\'ca\'c7\'b3\'d3\lang1033\f1 ip\lang2052\f2\'bc\'b0\'c6\'e4\'d0\'cd\'ba\'c5\'d0\'c5\'cf\'a2\'a3\'ac\'b4\'e6\'b7\'c5\'b9\'e6\'d4\'f2\'ca\'c7\'d0\'d0\'b4\'e6\'b7\'c5\'a3\'ac\'cf\'c8\'d0\'b4\lang1033\f1 IP\lang2052\f2\'b5\'d8\'d6\'b7\'a3\'ac\'c8\'bb\'ba\'f3\lang1033\f1 Tab\lang2052\f2\'a3\'ac\'d4\'da\'d0\'b4\'b3\'d3\'d0\'cd\'a3\'ac\'d2\'d4\'cf\'c2\'ca\'c7\'b3\'d3\'d0\'cd\'cb\'b5\'c3\'f7\'a3\'ba\lang1033\f1\par
+\pard\nowidctlpar\qj\tab\tab\lang2052\f2\'b3\'d3\'d0\'cd\'cb\'b5\'c3\'f7\lang1033\f1 :\tab\tab 1 \lang2052\f2\'b4\'fa\'b1\'ed\lang1033\f1\tab TMBZ_5\lang2052\f2\'ce\'bb\'b5\'a5\'bc\'db\'cc\'f5\'c2\'eb\'b3\'d3\lang1033\f1\par
+\tab\tab\tab\tab\tab\tab 2 \lang2052\f2\'b4\'fa\'b1\'ed\lang1033\f1\tab TMBZ_6\lang2052\f2\'ce\'bb\'b5\'a5\'bc\'db\'cc\'f5\'c2\'eb\'b3\'d3\lang1033\f1\par
+\tab\tab\tab\tab\tab\tab 3 \lang2052\f2\'b4\'fa\'b1\'ed\lang1033\f1\tab TMA_07\lang2052\f2\'c4\'ea\'d0\'c2\'b0\'e6\'cc\'f5\'c2\'eb\'b3\'d3\lang1033\f1\par
+\par
+\tab\lang2052\f2\ldblquote\lang1033\f1 dhplupathname.ini\lang2052\f2\rdblquote\'b4\'e6\'b7\'c5\'b5\'c4\'ca\'c7\'c4\'fa\'d2\'aa\'c9\'fa\'b3\'c9\'c4\'bf\'b1\'ea\lang1033\f1 PLU\lang2052\f2\'ce\'c4\'bc\'fe\'b5\'c4\'d4\'b4\lang1033\f1 PLU\lang2052\f2\'ce\'c4\'bc\'fe\'b5\'c4\'c2\'b7\'be\'b6\'c3\'fb\lang1033\f1 ;\lang2052\f2\'b4\'e6\'b7\'c5\'b9\'e6\'d4\'f2\'ca\'c7\'d4\'da\lquote\lang1033\f1 _PLU_PATH_\lang2052\f2\rquote\'ba\'f3\'bc\'d3\'c9\'cf\'d4\'b4\lang1033\f1 PLU\lang2052\f2\'ce\'c4\'bc\'fe\'b5\'c4\'c2\'b7\'be\'b6\'c3\'fb\'a3\'ac\'d6\'d0\'bc\'e4\'d2\'d4\lang1033\f1 Tab\lang2052\f2\'b8\'f4\'bf\'aa\'a1\'a3\lang1033\f1\par
+\par
+\tab\lang2052\f2\ldblquote\lang1033\f1 dhpluversion.ini\lang2052\f2\rdblquote\'b4\'e6\'b7\'c5\'b5\'c4\'ca\'c7\'d4\'b4\lang1033\f1 PLU\lang2052\f2\'ce\'c4\'bc\'fe\'b5\'c4\'b0\'e6\'b1\'be\'a3\'ac\'b4\'e6\'b7\'c5\'b9\'e6\'d4\'f2\'ca\'c7\'d4\'da\lquote\lang1033\f1 PLU_VERSION\lang2052\f2\rquote\'ba\'f3\'bc\'d3\'c9\'cf\'d4\'b4\lang1033\f1 PLU\lang2052\f2\'ce\'c4\'bc\'fe\'b5\'c4\'b0\'e6\'b1\'be\'a3\'a8\'bc\'b4\'b4\'d3\'ba\'ce\'d6\'d6\'c9\'cf\'ce\'bb\'bb\'fa\'c8\'ed\'bc\'fe\'b5\'bc\'b3\'f6\'b5\'c4\lang1033\f1 PLU\lang2052\f2\'ce\'c4\'bc\'fe\'a3\'a9\'a3\'ac\'d6\'d0\'bc\'e4\'d2\'d4\lang1033\f1 Tab\lang2052\f2\'b8\'f4\'bf\'aa\'a1\'a3\'d2\'d4\'cf\'c2\'ca\'c7\lang1033\f1 PLU\lang2052\f2\'b0\'e6\'b1\'be\'cb\'b5\'c3\'f7\'a3\'ba\lang1033\f1\par
+\tab\tab PLU\lang2052\f2\'b0\'e6\'b1\'be\'cb\'b5\'c3\'f7\lang1033\f1 :\tab 1 \lang2052\f2\'b4\'fa\'b1\'ed\lang1033\f1\tab TMBZ_5\lang2052\f2\'ce\'bb\'b5\'a5\'bc\'db\'cc\'f5\'c2\'eb\'b3\'d3\lang1033\f1 PLU\par
+\tab\tab\tab\tab\tab\tab 2 \lang2052\f2\'b4\'fa\'b1\'ed\lang1033\f1\tab TMBZ_6\lang2052\f2\'ce\'bb\'b5\'a5\'bc\'db\'cc\'f5\'c2\'eb\'b3\'d3\lang1033\f1 PLU\par
+\tab\tab\tab\tab\tab\tab 3 \lang2052\f2\'b4\'fa\'b1\'ed\lang1033\f1\tab TMA_07\lang2052\f2\'c4\'ea\'d0\'c2\'b0\'e6\'cc\'f5\'c2\'eb\'b3\'d3\lang1033\f1 PLU\par
+\tab\lang2052\f2\'b4\'b4\'bd\'a8\'cd\'ea\lang1033\f1 PLU\lang2052\f2\'bb\'b7\'be\'b3\'ba\'f3\'be\'cd\'bf\'c9\'d2\'d4\'b5\'f7\'d3\'c3\'b1\'be\'ba\'af\'ca\'fd\'c1\'cb\lang1033\f1 .\par
+\tab\par
+\tab\lang2052\f2\'b9\'a6\'c4\'dc\lang1033\f1 :\tab\lang2052\f2\'cd\'a8\'b9\'fd\'b6\'c1\'c8\'a1\lang1033\f1 dhplupathname.ini\lang2052\f2\'d6\'d0\lang1033\f1 PLU\lang2052\f2\'c2\'b7\'be\'b6\'cb\'f9\'d6\'b8\'cf\'f2\'b5\'c4\lang1033\f1 PLU\lang2052\f2\'d4\'b4\'ce\'c4\'bc\'fe\'ba\'cd\lang1033\f1 dhip.ini\lang2052\f2\'d6\'d0\'b5\'c4\'b3\'d3\'d0\'c5\'cf\'a2\lang1033\f1  , \lang2052\f2\'cf\'f2\'c4\'bf\'b1\'ea\'b3\'d3\'cd\'f8\'c2\'e7\'b7\'a2\'cb\'cd\lang1033\f1 PLU\lang2052\f2\'d4\'b4\'ce\'c4\'bc\'fe\lang1033\f1\tab .\tab\lang2052\f2\'cd\'ac\'ca\'b1\'b2\'fa\'c9\'fa\lang1033\f1 Return.txt\lang2052\f2 ,\'b6\'d4\'d3\'a6\'cd\'f8\'c2\'e7\'d6\'d0\'b5\'a5\'cc\'a8\'b3\'d3\'b5\'c4\'b7\'a2\'cb\'cd\'b3\'f6\'b4\'ed\'d0\'c5\'cf\'a2\'ba\'cd\'b3\'d3\'b7\'b5\'bb\'d8\'d0\'c5\'cf\'a2\lang1033\f1  \par
+\par
+\tab\lang2052\f2\'b7\'b5\'bb\'d8\'d6\'b5\'cb\'b5\'c3\'f7\lang1033\f1 :\lang2052\f2  \par
+\pard\nowidctlpar\fi420\qj //\tab 0\tab\tab\tab\'b3\'c9\'b9\'a6\par
+//\tab -1\tab\tab\tab\'c1\'ac\'bd\'d3\'ca\'a7\'b0\'dc\par
+//\tab -2\tab\tab\tab\'cd\'a8\'d1\'b6\'ca\'a7\'b0\'dc(\'b7\'fe\'ce\'f1\'c6\'f7\'ce\'de\'cf\'ec\'d3\'a6\'a3\'ac\'bb\'f2\'b7\'fe\'ce\'f1\'c6\'f7\'b7\'b5\'bb\'d8\'ca\'fd\'be\'dd\'b4\'ed\'ce\'f3)\par
+//\tab -3\tab\tab\tab\'b7\'a2\'cb\'cd\'ca\'a7\'b0\'dc(\'d0\'b4\'b7\'a2\'cb\'cd\'bb\'ba\'b3\'e5\'ca\'a7\'b0\'dc)\par
+//\tab -4\tab\tab\tab\'c1\'ac\'bd\'d3\'b6\'cf\'bf\'aa\par
+//\tab -5\tab\tab\tab\'b4\'fd\'b7\'a2\'cb\'cd\'ca\'fd\'be\'dd\'ce\'aa\'bf\'d5\par
+//\tab -6\tab\tab\tab\'d3\'c3\'bb\'a7\'ca\'d6\'b6\'af\'cd\'cb\'b3\'f6\par
+//\tab -7\tab\tab\tab\'c4\'bf\'b1\'eaIP\'ce\'aa\'bf\'d5\par
+//\tab -9\tab\tab\tab\'cd\'a8\'d1\'b6\'ce\'b4\'c8\'ab\'b2\'bf\'b3\'c9\'b9\'a6\'a3\'ac\'c4\'b3IP\'b3\'f6\'b4\'ed\'a3\'ac\'be\'df\'cc\'e5\'d0\'c5\'cf\'a2\'b1\'a3\'b4\'e6\'d4\'dareturn.txt\'d6\'d0 .\par
+//\tab -12\tab\tab\tab dhpluversion.int\'ce\'aa\'bf\'d5\'bb\'f2\'c9\'e8\'d6\'c3\'b4\'ed\'ce\'f3\par
+//\tab -13\tab\tab\tab dhplupathname.ini\'ce\'aa\'bf\'d5\'bb\'f2\'c9\'e8\'d6\'c3\'b4\'ed\'ce\'f3\par
+//\tab -14\tab\tab\tab dhplupathname.ini\'d6\'d0\'b6\'c1\'c8\'a1\'b5\'c4Plu\'c2\'b7\'be\'b6\'b2\'bb\'b6\'d4,\'cb\'f9\'d6\'b8\'cf\'f2\'b5\'c4Plu\'ce\'c4\'bc\'fe\'b2\'bb\'b4\'e6\'d4\'da\par
+//\tab -15\tab\tab\tab Plu\'ce\'c4\'b1\'be\'ce\'aa\'bf\'d5\'bb\'f2\'d5\'df\'c9\'e8\'d6\'c3\'b4\'ed\'ce\'f3(\'c8\'e7:Plu\'b0\'e6\'b1\'be\'d3\'ebPlu\'ce\'c4\'b1\'be\'c4\'da\'c8\'dd\'b2\'bb\'d2\'bb\'d6\'c2\'b5\'c8)\lang1033\f1\par
+\par
+Return.txt\lang2052\f2\'d6\'d0\'be\'df\'cc\'e5\'d2\'ec\'b3\'a3\'c7\'e9\'bf\'f6\'cb\'b5\'c3\'f7\lang1033\f1\par
+\lang2052\f2 //\tab 0\tab\tab\tab\'b3\'c9\'b9\'a6\par
+//\tab -1\tab\tab\tab\'c1\'ac\'bd\'d3\'ca\'a7\'b0\'dc\par
+//\tab -2\tab\tab\tab\'cd\'a8\'d1\'b6\'ca\'a7\'b0\'dc(\'b7\'fe\'ce\'f1\'c6\'f7\'ce\'de\'cf\'ec\'d3\'a6\'a3\'ac\'bb\'f2\'b7\'fe\'ce\'f1\'c6\'f7\'b7\'b5\'bb\'d8\'ca\'fd\'be\'dd\'b4\'ed\'ce\'f3)\par
+//\tab -3\tab\tab\tab\'b7\'a2\'cb\'cd\'ca\'a7\'b0\'dc(\'d0\'b4\'b7\'a2\'cb\'cd\'bb\'ba\'b3\'e5\'ca\'a7\'b0\'dc)\par
+\pard\nowidctlpar\fi-836\li1256\qj //\tab -4\tab\tab\tab\'c1\'ac\'bd\'d3\'b6\'cf\'bf\'aa\lang1033\f1\par
+\par
+int\tab dhRcvRdDefault();\par
+dhRcvRdDefault \lang2052\f2\fs20\'ba\'af\'ca\'fd\'d6\'bb\'d6\'a7\'b3\'d6\'d0\'c2\'b0\'e6\'cc\'f5\'c2\'eb\'b3\'d3\'ba\'cd\'ca\'d5\'d2\'f8\'b3\'d3\par
+\pard\nowidctlpar\qj\fs21\tab\'be\'df\'cc\'e5\'b7\'bd\'b7\'a8\'ca\'c7\lang1033\f1 :\tab\lang2052\f2\'b0\'d1\'b1\'be\lang1033\f1 DLL\lang2052\f2\'bf\'e2\'ba\'cd\lang1033\f1 dhip.ini \lang2052\f2\fs20\'d7\'e9\'ba\'cf\'ca\'b9\'d3\'c3,\lang1033\f1\fs21 dhip.ini \lang2052\f2\fs20\'c9\'e8\'d6\'c3ip\'b2\'ce\'ca\'fd,\'d2\'d4\'bb\'d8\'b3\'b5\'bd\'e1\'ca\'f8\'d2\'bb\'b8\'f6ip\par
+\tab\'b7\'b5\'bb\'d8\'d6\'b5\'cd\'ac\lang1033\f1\fs21 dhSendPluDefault ()\lang2052\f2\fs20\'d2\'bb\'d1\'f9\par
+\pard\nowidctlpar\fi-836\li1256\qj\par
+\'b9\'a6\'c4\'dc:\tab\'bb\'d8\'ca\'d5\'b5\'e7\'d7\'d3\'b3\'d3\'d6\'d0\'cf\'fa\'ca\'db\'bc\'c7\'c2\'bc,\'b1\'a3\'b4\'e6\'d4\'da\'bc\'c7\'ca\'c2\'b1\'be\'ce\'c4\'bc\'ferecord.txt\'d6\'d0\par
+\par
+\'bc\'c7\'ca\'c2\'b1\'be\'ce\'c4\'bc\'ferecord.txt\'b8\'f1\'ca\'bd:\par
+\'c0\'fd 192.168.1.199\tab\tab 0912041630\tab 00\tab 03\tab 0001\tab 2.560\tab 200.00\tab 51.00\tab 51.02\par
+\'ce\'aa ip\'b5\'d8\'d6\'b7\tab\tab\tab\'c4\'ea\'d4\'c2\'c8\'d5\'ca\'b1\'b7\'d6\tab\'b2\'bf\'c3\'c5 \'b5\'ea\'ba\'c5 PLU\'ba\'c5  \'d6\'d8\'c1\'bf    \'b5\'a5\'bc\'db\tab\tab\'d5\'db\'c7\'b0\'d7\'dc\'bc\'db \'d5\'db\'ba\'f3\'d7\'dc\'bc\'db\lang1033\f1\fs21\par
+}
+ 
