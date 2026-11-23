@@ -47,16 +47,31 @@ import kotlinx.coroutines.launch
 import java.io.File
 import javax.swing.JFileChooser
 
-private val PALETTE_KINDS = listOf(
-    LabelElementKind.TEXT,
-    LabelElementKind.PLU_NAME,
-    LabelElementKind.SHOP_NAME,
-    LabelElementKind.BARCODE,
-    LabelElementKind.QRCODE,
-    LabelElementKind.WEIGHT,
-    LabelElementKind.UNIT_PRICE,
+/** 商品数据字段（对齐 DIGI Label Format 2005 左侧 PLU字段 面板）。 */
+private val PLU_FIELD_KINDS = listOf(
+    LabelElementKind.PLU_NO,
     LabelElementKind.TOTAL_PRICE,
+    LabelElementKind.UNIT_PRICE,
+    LabelElementKind.WEIGHT,
+    LabelElementKind.QUANTITY,
+    LabelElementKind.QUANTITY_SYMBOL,
+    LabelElementKind.PLU_NAME,
+    LabelElementKind.BARCODE,
+    LabelElementKind.SHOP_NAME,
+    LabelElementKind.MAIN_GROUP,
+    LabelElementKind.INGREDIENT,
+    LabelElementKind.SPECIAL_MSG,
+    LabelElementKind.TAXED_PRICE,
+    LabelElementKind.TAX,
+)
+
+/** 图形元素（文本/日期时间/二维码/外框/图像）。 */
+private val SHAPE_KINDS = listOf(
+    LabelElementKind.TEXT,
     LabelElementKind.DATE,
+    LabelElementKind.QRCODE,
+    LabelElementKind.FRAME,
+    LabelElementKind.LOGO,
 )
 
 private val ROTATION_OPTIONS = listOf(0, 90, 180, 270)
@@ -78,8 +93,8 @@ private fun defaultElement(kind: LabelElementKind, index: Int): LabelElement = L
     kind = kind,
     xMm = 4f,
     yMm = 4f + (index % 6) * 5f,
-    widthMm = 24f,
-    heightMm = 6f,
+    widthMm = if (kind == LabelElementKind.FRAME) 30f else 24f,
+    heightMm = if (kind == LabelElementKind.FRAME) 20f else 6f,
     text = when (kind) {
         LabelElementKind.BARCODE -> "69012345"
         else -> ""
@@ -201,6 +216,7 @@ fun LabelEditorDialog(
                         modifier = Modifier.weight(1f),
                     )
                     PropertyPanel(
+                        template = template,
                         elements = template.elements,
                         selected = selected,
                         onUpdate = { index, element ->
@@ -229,6 +245,19 @@ fun LabelEditorDialog(
                                     if (toFront) rest + el else listOf(el) + rest
                                 }
                                 selected = if (toFront) template.elements.size - 1 else 0
+                            }
+                        },
+                        onShift = { up ->
+                            selected?.let { i ->
+                                val size = template.elements.size
+                                val newIdx = (if (up) i + 1 else i - 1).coerceIn(0, size - 1)
+                                updateElements { list ->
+                                    list.toMutableList().apply {
+                                        val el = removeAt(i)
+                                        add(newIdx, el)
+                                    }
+                                }
+                                selected = newIdx
                             }
                         },
                         onCenter = { horizontal ->
@@ -283,8 +312,15 @@ fun LabelEditorDialog(
 @Composable
 private fun PaletteColumn(onAdd: (LabelElementKind) -> Unit) {
     Column(modifier = Modifier.width(150.dp).fillMaxHeight().verticalScroll(rememberScrollState())) {
-        Text(tr("label.palette"), fontSize = 14.sp)
-        PALETTE_KINDS.forEach { kind ->
+        Text(tr("label.pluFields"), fontSize = 13.sp, color = Color(0xFF1E88E5))
+        PLU_FIELD_KINDS.forEach { kind ->
+            Button(onClick = { onAdd(kind) }, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                Text(tr("label.kind." + kind.name))
+            }
+        }
+        Divider(Modifier.padding(vertical = 6.dp))
+        Text(tr("label.shapes"), fontSize = 13.sp, color = Color(0xFF1E88E5))
+        SHAPE_KINDS.forEach { kind ->
             Button(onClick = { onAdd(kind) }, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                 Text(tr("label.kind." + kind.name))
             }
@@ -294,17 +330,26 @@ private fun PaletteColumn(onAdd: (LabelElementKind) -> Unit) {
 
 @Composable
 private fun PropertyPanel(
+    template: LabelTemplate,
     elements: List<LabelElement>,
     selected: Int?,
     onUpdate: (Int, LabelElement) -> Unit,
     onDelete: () -> Unit,
     onDuplicate: () -> Unit,
     onOrder: (toFront: Boolean) -> Unit,
+    onShift: (up: Boolean) -> Unit,
     onCenter: (horizontal: Boolean) -> Unit,
 ) {
     val element = selected?.let { elements.getOrNull(it) }
     Column(modifier = Modifier.width(240.dp).fillMaxHeight().verticalScroll(rememberScrollState())) {
-        Text(tr("label.properties"), fontSize = 14.sp)
+        // ---- 标签信息（对齐 Label Format 2005 右侧属性区：mm 与 Dot 双单位，8 dots/mm）----
+        Text(tr("label.info"), fontSize = 13.sp, color = Color(0xFF1E88E5))
+        InfoRow(tr("label.formatNo"), if (template.id > 0) template.id.toString() else "-")
+        InfoRow(tr("label.width"), "${template.widthMm} (mm) · ${template.widthMm * 8} (Dot)")
+        InfoRow(tr("label.height"), "${template.heightMm} (mm) · ${template.heightMm * 8} (Dot)")
+        Divider(Modifier.padding(vertical = 4.dp))
+
+        Text(tr("label.properties"), fontSize = 13.sp, color = Color(0xFF1E88E5))
         if (element == null) {
             Text(tr("label.selectHint"), fontSize = 11.sp, color = Color(0xFF808080))
             return@Column
@@ -367,7 +412,19 @@ private fun PropertyPanel(
             SmallAction(tr("label.front"), Modifier.weight(1f)) { onOrder(true) }
             SmallAction(tr("label.back"), Modifier.weight(1f)) { onOrder(false) }
         }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            SmallAction(tr("label.upOne"), Modifier.weight(1f)) { onShift(true) }
+            SmallAction(tr("label.downOne"), Modifier.weight(1f)) { onShift(false) }
+        }
         Button(onClick = onDelete, modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) { Text(tr("label.deleteElement")) }
+    }
+}
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
+        Text(label, Modifier.width(70.dp), fontSize = 11.sp, color = Color(0xFF808080))
+        Text(value, fontSize = 11.sp)
     }
 }
 

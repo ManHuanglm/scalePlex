@@ -15,9 +15,68 @@ data class LabelTemplate(
     val note: String = "",
 )
 
-/** Kinds of element that can appear on a label. */
+/**
+ * Kinds of element that can appear on a label. Aligned with the DIGI "Label Format 2005"
+ * PLU data fields (商品数据：PLU编号/价格/重量/成分/特殊信息...) plus generic shapes.
+ * Serialized by name into JSON; unknown names degrade to TEXT on read.
+ */
 enum class LabelElementKind {
-    TEXT, BARCODE, QRCODE, WEIGHT, UNIT_PRICE, TOTAL_PRICE, DATE, LOGO, PLU_NAME, SHOP_NAME
+    /** 自由文本。 */
+    TEXT,
+
+    /** 条码（EAN/ITF）。 */
+    BARCODE,
+
+    /** 二维码。 */
+    QRCODE,
+
+    /** 称重打印重量 (kg)。 */
+    WEIGHT,
+
+    /** 单价。 */
+    UNIT_PRICE,
+
+    /** 合计金额。 */
+    TOTAL_PRICE,
+
+    /** 税后价格。 */
+    TAXED_PRICE,
+
+    /** 税率号。 */
+    TAX,
+
+    /** 打印日期。 */
+    DATE,
+
+    /** 图像 / 店标（寺冈 Label Format 2005 的"图像"，首期编码跳过）。 */
+    LOGO,
+
+    /** 商品名称。 */
+    PLU_NAME,
+
+    /** 店名。 */
+    SHOP_NAME,
+
+    /** PLU编号。 */
+    PLU_NO,
+
+    /** 数量（计件）。 */
+    QUANTITY,
+
+    /** 数量单位 (kg/pcs)。 */
+    QUANTITY_SYMBOL,
+
+    /** 成分。 */
+    INGREDIENT,
+
+    /** 特殊信息。 */
+    SPECIAL_MSG,
+
+    /** 部门号。 */
+    MAIN_GROUP,
+
+    /** 外框（矩形框线，无文本）。 */
+    FRAME,
 }
 
 data class LabelElement(

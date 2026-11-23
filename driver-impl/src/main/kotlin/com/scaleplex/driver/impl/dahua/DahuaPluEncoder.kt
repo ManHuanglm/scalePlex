@@ -49,7 +49,7 @@ object DahuaPluEncoder {
         template.elements.joinToString(";") { encodeElement(it) },
     )
 
-    /** 元素类型 → 协议 kindCode（待联调校准映射表）。 */
+    /** 元素类型 → 协议 kindCode（待联调校准映射表；未支持类型返回 null 跳过下发）。 */
     private fun kindCode(kind: LabelElementKind): String? = when (kind) {
         LabelElementKind.TEXT -> "T"
         LabelElementKind.BARCODE -> "B"
@@ -60,7 +60,7 @@ object DahuaPluEncoder {
         LabelElementKind.DATE -> "D"
         LabelElementKind.PLU_NAME -> "N"
         LabelElementKind.SHOP_NAME -> "S"
-        LabelElementKind.LOGO -> null
+        else -> null
     }
 
     private fun encodeElement(e: LabelElement): String {

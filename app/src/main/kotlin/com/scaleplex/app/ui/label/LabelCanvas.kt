@@ -8,9 +8,13 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.Canvas
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
@@ -30,6 +34,9 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,13 +49,20 @@ import com.scaleplex.core.i18n.tr
 /** 网格间距：5mm。 */
 private const val GRID_STEP_MM = 5
 
+/** 标尺主刻度间距：5mm（主刻度带数字），小刻度 1mm。 */
+private const val RULER_MAJOR_MM = 5
+
 /** 方向键微调步长（mm），按住 Shift 为 5mm。 */
 private const val NUDGE_MM = 1f
 private const val NUDGE_FAST_MM = 5f
 
+private val RULER_COLOR = Color(0xFF555555)
+private val RULER_TEXT_COLOR = Color(0xFF666666)
+
 /**
- * 标签毫米坐标画布：纸张按可用区域 fit 缩放或 1:1 显示，元素可点击选中、拖拽移动、
- * 方向键微调；编辑模式显示 5mm 网格，[preview] 模式为纯打印效果渲染（无网格/边框/交互）。
+ * 标签毫米坐标画布：对齐 DIGI Label Format 2005 —— 纸张带顶部/左侧 mm 标尺（1mm 小刻度、
+ * 5mm 数字主刻度），编辑模式显示 5mm 网格，元素可点击选中、拖拽移动、方向键微调；
+ * [preview] 模式为纯打印效果渲染（无标尺/网格/边框/交互）。
  * 拖拽增量以毫米回传给调用方，由编辑器统一更新状态（单向数据流）。
  */
 @Composable
@@ -64,34 +78,44 @@ fun LabelCanvas(
     val focusRequester = remember { FocusRequester() }
     BoxWithConstraints(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val pxPerMm = if (oneToOne) 8f else minOf(
-            maxWidth.value / template.widthMm.coerceAtLeast(1),
-            maxHeight.value / template.heightMm.coerceAtLeast(1),
+            (maxWidth.value - 20f) / template.widthMm.coerceAtLeast(1),
+            (maxHeight.value - 20f) / template.heightMm.coerceAtLeast(1),
         )
-        Surface(
-            modifier = Modifier
-                .size((template.widthMm * pxPerMm).dp, (template.heightMm * pxPerMm).dp)
-                .focusRequester(focusRequester)
-                .focusable()
-                .onPreviewKeyEvent { event ->
-                    handleNudge(event, selectedIndex, onMove)
-                }
-                .clickable(enabled = !preview) { onSelect(null) },
-            color = Color.White,
-            border = if (preview) BorderStroke(1.dp, Color(0xFFB0B0B0)) else BorderStroke(1.dp, Color(0xFF808080)),
-        ) {
-            Box {
+        Column(horizontalAlignment = Alignment.Start) {
+            if (!preview) {
+                TopRuler(template.widthMm, pxPerMm)
+            }
+            Row {
                 if (!preview) {
-                    GridLayer(template, pxPerMm)
+                    LeftRuler(template.heightMm, pxPerMm)
                 }
-                template.elements.forEachIndexed { index, element ->
-                    ElementView(
-                        element = element,
-                        pxPerMm = pxPerMm,
-                        selected = !preview && index == selectedIndex,
-                        interactive = !preview,
-                        onSelect = { onSelect(index); focusRequester.requestFocus() },
-                        onDrag = { dx, dy -> onMove(index, dx, dy) },
-                    )
+                Surface(
+                    modifier = Modifier
+                        .size((template.widthMm * pxPerMm).dp, (template.heightMm * pxPerMm).dp)
+                        .focusRequester(focusRequester)
+                        .focusable()
+                        .onPreviewKeyEvent { event ->
+                            handleNudge(event, selectedIndex, onMove)
+                        }
+                        .clickable(enabled = !preview) { onSelect(null) },
+                    color = Color.White,
+                    border = BorderStroke(1.dp, if (preview) Color(0xFFB0B0B0) else Color(0xFF808080)),
+                ) {
+                    Box {
+                        if (!preview) {
+                            GridLayer(template, pxPerMm)
+                        }
+                        template.elements.forEachIndexed { index, element ->
+                            ElementView(
+                                element = element,
+                                pxPerMm = pxPerMm,
+                                selected = !preview && index == selectedIndex,
+                                interactive = !preview,
+                                onSelect = { onSelect(index); focusRequester.requestFocus() },
+                                onDrag = { dx, dy -> onMove(index, dx, dy) },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -112,6 +136,60 @@ private fun handleNudge(
         Key.DirectionUp -> { onMove(selectedIndex, 0f, -step); true }
         Key.DirectionDown -> { onMove(selectedIndex, 0f, step); true }
         else -> false
+    }
+}
+
+/** 顶部 mm 标尺：1mm 小刻度，5mm 主刻度带数字。 */
+@Composable
+private fun TopRuler(widthMm: Int, pxPerMm: Float) {
+    val measurer = rememberTextMeasurer()
+    Canvas(modifier = Modifier.width((widthMm * pxPerMm).dp).height(18.dp)) {
+        var mm = 0
+        while (mm <= widthMm) {
+            val x = mm * pxPerMm
+            val major = mm % RULER_MAJOR_MM == 0
+            drawLine(
+                RULER_COLOR,
+                Offset(x, if (major) 0f else size.height * 0.55f),
+                Offset(x, size.height),
+                1f,
+            )
+            if (major && mm > 0) {
+                drawText(
+                    measurer, mm.toString(),
+                    topLeft = Offset(x + 2f, 1f),
+                    style = TextStyle(fontSize = 8.sp, color = RULER_TEXT_COLOR),
+                )
+            }
+            mm++
+        }
+    }
+}
+
+/** 左侧 mm 标尺。 */
+@Composable
+private fun LeftRuler(heightMm: Int, pxPerMm: Float) {
+    val measurer = rememberTextMeasurer()
+    Canvas(modifier = Modifier.width(18.dp).height((heightMm * pxPerMm).dp)) {
+        var mm = 0
+        while (mm <= heightMm) {
+            val y = mm * pxPerMm
+            val major = mm % RULER_MAJOR_MM == 0
+            drawLine(
+                RULER_COLOR,
+                Offset(if (major) 0f else size.width * 0.55f, y),
+                Offset(size.width, y),
+                1f,
+            )
+            if (major && mm > 0) {
+                drawText(
+                    measurer, mm.toString(),
+                    topLeft = Offset(1f, y + 2f),
+                    style = TextStyle(fontSize = 8.sp, color = RULER_TEXT_COLOR),
+                )
+            }
+            mm++
+        }
     }
 }
 
@@ -162,18 +240,23 @@ private fun ElementView(
         else -> base
     }
     Box(modifier = base, contentAlignment = Alignment.Center) {
-        Text(
-            text = displayText(element),
-            fontSize = maxOf(element.fontSizePt * 0.9f, 8f).sp,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Clip,
-            color = if (interactive) MaterialTheme.colors.onSurface else Color.Black,
-        )
+        if (element.kind == LabelElementKind.FRAME) {
+            // 外框：仅框线，无文本（线宽即边框）
+            Box(modifier = Modifier.fillMaxSize().border(1.dp, if (interactive) borderColor else Color.Black))
+        } else {
+            Text(
+                text = displayText(element),
+                fontSize = maxOf(element.fontSizePt * 0.9f, 8f).sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
+                color = if (interactive) MaterialTheme.colors.onSurface else Color.Black,
+            )
+        }
     }
 }
 
-/** 画布上的元素占位显示文本（非打印内容，仅辅助识别）。 */
+/** 画布上的元素占位显示文本（非打印内容，仅辅助识别，对齐 Label Format 2005 数据域）。 */
 private fun displayText(element: LabelElement): String = when (element.kind) {
     LabelElementKind.TEXT, LabelElementKind.PLU_NAME, LabelElementKind.SHOP_NAME ->
         element.text.ifBlank { tr("label.kind." + element.kind.name) }
@@ -182,6 +265,15 @@ private fun displayText(element: LabelElement): String = when (element.kind) {
     LabelElementKind.WEIGHT -> "W kg"
     LabelElementKind.UNIT_PRICE -> "¥/kg"
     LabelElementKind.TOTAL_PRICE -> "¥¥"
+    LabelElementKind.TAXED_PRICE -> "¥(税)"
+    LabelElementKind.TAX -> "5%"
+    LabelElementKind.PLU_NO -> "0001"
+    LabelElementKind.QUANTITY -> "×1"
+    LabelElementKind.QUANTITY_SYMBOL -> "kg"
+    LabelElementKind.INGREDIENT, LabelElementKind.SPECIAL_MSG ->
+        element.text.ifBlank { tr("label.kind." + element.kind.name) }
+    LabelElementKind.MAIN_GROUP -> "997"
     LabelElementKind.DATE -> element.text.ifBlank { "2026-01-01" }
     LabelElementKind.LOGO -> tr("label.kind.LOGO")
+    LabelElementKind.FRAME -> ""
 }

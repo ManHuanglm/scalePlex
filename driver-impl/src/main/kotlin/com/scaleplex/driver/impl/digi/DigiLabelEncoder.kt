@@ -25,7 +25,7 @@ object DigiLabelEncoder {
 
     private val CHARSETS_GBK = charset("GBK")
 
-    /** 元素类型 → DIGI kindCode（待联调校准映射表）。 */
+    /** 元素类型 → DIGI kindCode（对齐 Label Format 2005 数据域，待联调校准映射表）。 */
     fun kindCode(kind: LabelElementKind): Int? = when (kind) {
         LabelElementKind.TEXT -> 0x01
         LabelElementKind.PLU_NAME -> 0x02
@@ -36,6 +36,16 @@ object DigiLabelEncoder {
         LabelElementKind.UNIT_PRICE -> 0x07
         LabelElementKind.TOTAL_PRICE -> 0x08
         LabelElementKind.DATE -> 0x09
+        // 以下对应 Label Format 2005 商品数据字段（PLU编号/数量/数量单位/成分/特殊信息/部门号/税后价格/税率/外框）
+        LabelElementKind.PLU_NO -> 0x0A
+        LabelElementKind.QUANTITY -> 0x0B
+        LabelElementKind.QUANTITY_SYMBOL -> 0x0C
+        LabelElementKind.INGREDIENT -> 0x0D
+        LabelElementKind.SPECIAL_MSG -> 0x0E
+        LabelElementKind.MAIN_GROUP -> 0x0F
+        LabelElementKind.TAXED_PRICE -> 0x10
+        LabelElementKind.TAX -> 0x11
+        LabelElementKind.FRAME -> 0x12
         LabelElementKind.LOGO -> null
     }
 
