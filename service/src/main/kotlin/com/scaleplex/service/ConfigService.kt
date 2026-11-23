@@ -35,8 +35,9 @@ class ConfigService(db: Database) {
             mtApiDllPath = g("mtApiDllPath", ""),
             digiToolsPath = g("digiToolsPath", ""),
             dahuaToolsPath = g("dahuaToolsPath", ""),
+            aclasToolsPath = g("aclasToolsPath", ""),
         )
-        // 启动时同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS / 大华 DhScalePluNet）
+        // 启动时同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS / 大华 DhScalePluNet / 顶尖 AclasSDK）
         if (config.mtApiDllPath.isNotBlank()) {
             System.setProperty("scaleplex.mt.dll", config.mtApiDllPath)
         }
@@ -45,6 +46,9 @@ class ConfigService(db: Database) {
         }
         if (config.dahuaToolsPath.isNotBlank()) {
             System.setProperty("scaleplex.dahua.tools", config.dahuaToolsPath)
+        }
+        if (config.aclasToolsPath.isNotBlank()) {
+            System.setProperty("scaleplex.aclas.tools", config.aclasToolsPath)
         }
         return config
     }
@@ -67,7 +71,8 @@ class ConfigService(db: Database) {
         dao.put("mtApiDllPath", cfg.mtApiDllPath)
         dao.put("digiToolsPath", cfg.digiToolsPath)
         dao.put("dahuaToolsPath", cfg.dahuaToolsPath)
-        // 同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS / 大华 DhScalePluNet）
+        dao.put("aclasToolsPath", cfg.aclasToolsPath)
+        // 同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS / 大华 DhScalePluNet / 顶尖 AclasSDK）
         if (cfg.mtApiDllPath.isNotBlank()) {
             System.setProperty("scaleplex.mt.dll", cfg.mtApiDllPath)
         }
@@ -76,6 +81,9 @@ class ConfigService(db: Database) {
         }
         if (cfg.dahuaToolsPath.isNotBlank()) {
             System.setProperty("scaleplex.dahua.tools", cfg.dahuaToolsPath)
+        }
+        if (cfg.aclasToolsPath.isNotBlank()) {
+            System.setProperty("scaleplex.aclas.tools", cfg.aclasToolsPath)
         }
         applyLocale(cfg.language)
     }

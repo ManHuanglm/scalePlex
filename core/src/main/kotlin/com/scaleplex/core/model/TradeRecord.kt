@@ -67,4 +67,6 @@ data class ScaleConfig(
     val digiToolsPath: String = "",
     /** 大华工具目录（DhScalePluNet.dll 所在），大华驱动桥接调用。 */
     val dahuaToolsPath: String = "",
+    /** 顶尖 Aclas 工具目录（AclasSDK.dll 所在），顶尖驱动桥接调用。 */
+    val aclasToolsPath: String = "",
 )
