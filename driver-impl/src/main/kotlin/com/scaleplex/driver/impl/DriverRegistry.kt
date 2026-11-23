@@ -5,6 +5,7 @@ import com.scaleplex.driver.api.ScaleDriverFactory
 import com.scaleplex.driver.impl.dahua.DahuaTcpDriver
 import com.scaleplex.driver.impl.digi.DigiSmDriver
 import com.scaleplex.driver.impl.hihong.HiHongUdpDriver
+import com.scaleplex.driver.impl.yousheng.YouShengDriver
 
 /**
  * Registers all concrete drivers with [ScaleDriverFactory]. Call [install] once at
@@ -22,8 +23,7 @@ object DriverRegistry {
             ScaleDriverFactory.register(ScaleBrand.DIGI) { device -> DigiSmDriver(device) }
             ScaleDriverFactory.register(ScaleBrand.DAHUA) { device -> DahuaTcpDriver(device) }
             ScaleDriverFactory.register(ScaleBrand.HIHONG) { device -> HiHongUdpDriver(device) }
-            // Phase 2/3 drivers:
-            // ScaleDriverFactory.register(ScaleBrand.YOUSHENG) { YouShengDriver(it) }
+            ScaleDriverFactory.register(ScaleBrand.YOUSHENG) { device -> YouShengDriver(device) }
             installed = true
         }
     }
