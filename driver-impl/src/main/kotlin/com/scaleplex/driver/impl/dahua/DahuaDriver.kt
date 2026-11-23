@@ -43,7 +43,9 @@ class DahuaDriver(
 
     override suspend fun getStatus(): Result<ScaleStatus> = withContext(Dispatchers.IO) {
         runCatching {
-            val online = tcpProbe(device.ip, device.port)
+            // 大华网络秤 TCP 监听端口 4001（各品牌端口对照表）；设备未配置时用默认
+            val port = device.port.takeIf { it > 0 } ?: ScaleBrand.DAHUA.defaultPort
+            val online = tcpProbe(device.ip, port)
             ScaleStatus(online = online, model = device.model.ifBlank { "DAHUA" })
         }
     }

@@ -11,6 +11,9 @@ import java.util.concurrent.TimeUnit
  * `TWS DELF <文件号> <IP> <端口>` 删除秤上文件。
  * 结果文件 `result` 每行 `IP:文件号:结果`（0=成功，负数=错误码，见 TCPDriver.doc 错误码表）。
  *
+ * 注意：命令第 4 参数"端口"实际为**秤号**（TWS 协议 TCP 目标端口内部固定；LabelNet
+ * 与秤端设置页均配置秤号，通常填秤 IP 后 3 位，默认 1）。
+ *
  * 工具目录（含 TWS.exe/SMScale.dll/SM.ini/Desc）通过系统属性 `scaleplex.digi.tools` 配置。
  */
 object DigiToolsBridge {

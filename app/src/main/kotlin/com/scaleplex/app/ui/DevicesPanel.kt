@@ -199,7 +199,10 @@ private fun DeviceEditorDialog(
                     trailingIcon = { TextButton(onClick = { brandExpanded = true }) { Text("▾") } })
                 DropdownMenu(brandExpanded, { brandExpanded = false }) {
                     ScaleBrand.values().forEach { b ->
-                        DropdownMenuItem(onClick = { dev = dev.copy(brand = b); brandExpanded = false }) { Text(b.displayName) }
+                        DropdownMenuItem(onClick = {
+                            // 切换品牌时端口联动为该品牌默认端口（各品牌端口对照表；可手改）
+                            dev = dev.copy(brand = b, port = b.defaultPort); brandExpanded = false
+                        }) { Text(b.displayName) }
                     }
                 }
 
@@ -226,7 +229,9 @@ private fun DeviceEditorDialog(
                     OutlinedTextField(dev.serial.stopBits.toString(), { s -> s.toIntOrNull()?.let { dev = dev.copy(serial = dev.serial.copy(stopBits = it)) } }, label = { Text(tr("serial.stopBits")) }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp))
                 } else {
                     OutlinedTextField(dev.ip, { dev = dev.copy(ip = it) }, label = { Text(tr("device.field.ip")) }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp))
-                    OutlinedTextField(dev.port.toString(), { s -> s.toIntOrNull()?.let { dev = dev.copy(port = it) } }, label = { Text(tr("device.field.port")) }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp))
+                    // 寺冈 TWS 协议的"端口"参数为秤号（LabelNet/秤端设置页均填秤号，通常为秤 IP 后 3 位）
+                    val portLabel = if (dev.brand == ScaleBrand.DIGI) tr("device.field.scaleNo") else tr("device.field.port")
+                    OutlinedTextField(dev.port.toString(), { s -> s.toIntOrNull()?.let { dev = dev.copy(port = it) } }, label = { Text(portLabel) }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp))
                 }
 
                 var groupExpanded by remember { mutableStateOf(false) }
