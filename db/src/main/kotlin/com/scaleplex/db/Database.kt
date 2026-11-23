@@ -58,6 +58,24 @@ class Database(private val dbFile: File) : AutoCloseable {
         dbFile.copyTo(target, overwrite = true)
     }
 
+    /**
+     * Restore the database from a backup file: close the live connection, overwrite
+     * the db file (including WAL/SHM companions), reopen and re-run migrations.
+     * Cached DAO statements are per-call so no further invalidation is needed;
+     * the UI should prompt the user to restart for in-memory caches to refresh.
+     */
+    fun restoreFrom(backup: File) {
+        if (!backup.exists()) error("backup file not found: $backup")
+        close()
+        dbFile.copyTo(File(dbFile.parentFile, "${dbFile.name}.bak.${System.currentTimeMillis()}"), overwrite = true)
+        backup.copyTo(dbFile, overwrite = true)
+        runCatching { File("$dbFile-wal").delete() }
+        runCatching { File("$dbFile-shm").delete() }
+        conn = DriverManager.getConnection("jdbc:sqlite:${dbFile.absolutePath}")
+        migrate()
+        log.info("Database restored from $backup")
+    }
+
     override fun close() {
         runCatching { conn?.close() }
         conn = null

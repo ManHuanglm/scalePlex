@@ -9,11 +9,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scaleplex.app.AppState
 import com.scaleplex.core.i18n.tr
+import java.io.File
+import javax.swing.JFileChooser
 
-/** System settings panel: language, comm timing, backup, debug toggles. */
+/** 系统设置面板：语言、通信参数、报文调试、主题、数据库备份/恢复。 */
 @Composable
 fun SettingsPanel(state: AppState, refresh: MutableState<Int>) {
     var cfg by remember { mutableStateOf(state.config) }
+    var message by remember { mutableStateOf("") }
+    var restoreFile by remember { mutableStateOf<File?>(null) }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(tr("tab.settings"), fontSize = 20.sp)
 
@@ -55,7 +60,49 @@ fun SettingsPanel(state: AppState, refresh: MutableState<Int>) {
             Switch(state.darkMode, { state.darkMode = it })
         }
 
+        // Database backup / restore
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(tr("settings.backup"), Modifier.width(160.dp))
+            Button(onClick = {
+                val chooser = JFileChooser()
+                chooser.selectedFile = File("scaleplex_backup.db")
+                if (chooser.showSaveDialog(null) == JFileChooser.APPROVE_OPTION) {
+                    runCatching { state.db.backupTo(chooser.selectedFile) }
+                        .onSuccess { message = tr("settings.backupDone") }
+                        .onFailure { message = it.message ?: "backup failed" }
+                }
+            }) { Text(tr("settings.backup")) }
+            Spacer(Modifier.width(12.dp))
+            Button(onClick = {
+                val chooser = JFileChooser()
+                if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                    restoreFile = chooser.selectedFile
+                }
+            }) { Text(tr("settings.restore")) }
+        }
+
+        if (message.isNotBlank()) {
+            Text(message, fontSize = 12.sp, color = androidx.compose.ui.graphics.Color(0xFF2E7D32))
+        }
+
         // Save
         Button(onClick = { state.applyConfig(cfg); refresh.value++ }) { Text(tr("settings.save")) }
+    }
+
+    restoreFile?.let { backup ->
+        AlertDialog(
+            onDismissRequest = { restoreFile = null },
+            title = { Text(tr("settings.restore")) },
+            text = { Text(tr("settings.restoreConfirm")) },
+            confirmButton = {
+                Button(onClick = {
+                    runCatching { state.db.restoreFrom(backup) }
+                        .onSuccess { message = tr("settings.restoreDone") }
+                        .onFailure { message = it.message ?: "restore failed" }
+                    restoreFile = null
+                }) { Text(tr("common.yes")) }
+            },
+            dismissButton = { TextButton(onClick = { restoreFile = null }) { Text(tr("common.no")) } },
+        )
     }
 }
