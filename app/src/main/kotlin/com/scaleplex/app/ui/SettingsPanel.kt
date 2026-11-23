@@ -91,6 +91,24 @@ fun SettingsPanel(state: AppState, refresh: MutableState<Int>) {
             }
         }
 
+        // 托利多 MTScaleKey DLL 路径
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(tr("settings.mtDll"), Modifier.width(160.dp))
+            OutlinedTextField(
+                cfg.mtApiDllPath, { cfg = cfg.copy(mtApiDllPath = it) },
+                modifier = Modifier.weight(1f),
+                label = { Text(tr("settings.mtDllHint")) },
+            )
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = {
+                val chooser = JFileChooser()
+                chooser.fileSelectionMode = JFileChooser.FILES_ONLY
+                if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                    cfg = cfg.copy(mtApiDllPath = chooser.selectedFile.absolutePath)
+                }
+            }) { Text(tr("common.ok")) }
+        }
+
         // Theme
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("深色模式 / Dark mode", Modifier.width(160.dp))

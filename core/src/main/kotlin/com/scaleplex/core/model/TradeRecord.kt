@@ -61,4 +61,6 @@ data class ScaleConfig(
     val autoDownload: Boolean = false,
     /** 下发条码格式编号（DIGI EAN 条码格式表，见 DigiTables.EAN_BARCODE_FORMATS）。 */
     val barcodeFormat: Int = 0,
+    /** MTScaleKey 接口 DLL 路径（托利多驱动桥接调用），空 = 默认 C:\MTScaleKey\MTScaleAPI\MTScaleAPI.dll。 */
+    val mtApiDllPath: String = "",
 )

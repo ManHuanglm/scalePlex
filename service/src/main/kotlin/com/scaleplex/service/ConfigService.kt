@@ -17,7 +17,7 @@ class ConfigService(db: Database) {
 
     fun load(): ScaleConfig {
         val g = { k: String, d: String -> dao.get(k) ?: d }
-        return ScaleConfig(
+        val config = ScaleConfig(
             language = g("language", "zh-CN"),
             priceDecimals = (g("priceDecimals", "2")).toIntOrNull() ?: 2,
             weightDecimals = (g("weightDecimals", "3")).toIntOrNull() ?: 3,
@@ -32,7 +32,13 @@ class ConfigService(db: Database) {
             backupPath = g("backupPath", ""),
             autoDownload = g("autoDownload", "false").toBoolean(),
             barcodeFormat = (g("barcodeFormat", "0")).toIntOrNull() ?: 0,
+            mtApiDllPath = g("mtApiDllPath", ""),
         )
+        // 启动时同步托利多 MTScaleKey DLL 路径
+        if (config.mtApiDllPath.isNotBlank()) {
+            System.setProperty("scaleplex.mt.dll", config.mtApiDllPath)
+        }
+        return config
     }
 
     fun save(cfg: ScaleConfig) {
@@ -50,6 +56,11 @@ class ConfigService(db: Database) {
         dao.put("backupPath", cfg.backupPath)
         dao.put("autoDownload", cfg.autoDownload.toString())
         dao.put("barcodeFormat", cfg.barcodeFormat.toString())
+        dao.put("mtApiDllPath", cfg.mtApiDllPath)
+        // 托利多 MTScaleKey DLL 路径同步给桥接器（本模块内可见 driver-impl）
+        if (cfg.mtApiDllPath.isNotBlank()) {
+            System.setProperty("scaleplex.mt.dll", cfg.mtApiDllPath)
+        }
         applyLocale(cfg.language)
     }
 
