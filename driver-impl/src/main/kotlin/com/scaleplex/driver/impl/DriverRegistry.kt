@@ -2,6 +2,7 @@ package com.scaleplex.driver.impl
 
 import com.scaleplex.core.model.ScaleBrand
 import com.scaleplex.driver.api.ScaleDriverFactory
+import com.scaleplex.driver.impl.dahua.DahuaTcpDriver
 import com.scaleplex.driver.impl.digi.DigiSmDriver
 
 /**
@@ -18,8 +19,8 @@ object DriverRegistry {
         synchronized(this) {
             if (installed) return
             ScaleDriverFactory.register(ScaleBrand.DIGI) { device -> DigiSmDriver(device) }
+            ScaleDriverFactory.register(ScaleBrand.DAHUA) { device -> DahuaTcpDriver(device) }
             // Phase 2/3 drivers:
-            // ScaleDriverFactory.register(ScaleBrand.DAHUA) { DahuaTcpDriver(it) }
             // ScaleDriverFactory.register(ScaleBrand.YOUSHENG) { YouShengDriver(it) }
             // ScaleDriverFactory.register(ScaleBrand.HIHONG) { HuiHongUdpDriver(it) }
             installed = true
