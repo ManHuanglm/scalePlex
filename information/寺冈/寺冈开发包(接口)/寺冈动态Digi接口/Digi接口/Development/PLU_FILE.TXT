@@ -1,0 +1,101 @@
+PLU FILE - (25H)
+
+Data:
+0000166100565D00DFE80100002490110021230016610000900997000000000000000000000000000000000000000000000000000000000000000000000000150DD1BCC8F3C0B0B3A6353030BFCB0C14000C14000C00
+
+'****************************************************************************************
+'解释
+00001661										:PLU Number		4 Bytes		BCD
+0056												:PLU Record Size	2 Bytes		HEX
+5D00												Status			2 Bytes		BIN
+														(Byte1,01011101;
+														 Byte2,00000000)
+DFE801											:Status2		3 Bytes		BIN
+														(Byte1,11011111;
+														 Byte2,11101000;
+														 Byte3,00000001)
+00002490										:Unit Price		4 Bytes		BCD
+11													:Label 1 Format		1 Byte		HEX
+00													:Label 2 Format		1 Byte		HEX
+21													:Barcode Format		1 Byte		HEX
+23001661000090							:EAN Date		7 Bytes		BCD
+'*********************EAN Date*******************************	
+23001661000090
+'解释
+23													:F1F2						1 Byte		BCD
+0016610000									:Item Code			5 Bytes		BCD
+9														:upper nibble of last byte
+														(9-ITF;
+														 0-EAN;
+														 8-EAN WITH 5 DIGIT ADD-ON)
+0														:under nibble of last byte
+														(0-Price;
+														 1-Weight;
+														 2-Quantity)
+'************************************************************
+0997												:Main Group Code	2 Bytes		BCD
+0000												:Sell By Date		2 Bytes		BCD
+															(3 digits BCD,no. of days)							
+0000												:Use By Date		2 Bytes		BCD
+															(3 digits BCD,no. of days)
+0000												:Packed Date		2 Bytes		BCD
+															(3 digits BCD,no. of days)
+000000000000000000000000000000000000000000000000000000000000	:Discount		30 Bytes
+'**********************discount******************************
+000000000000000000000000000000000000000000000000000000000000
+'解释
+00000000									:START DATE FOR DISCOUNT	4 BYTES	(6 digits BCD, DD.MM.YY)	
+0000											:START TIME FOR DISCOUNT	2 BYTES	(4 digits BCD, HH:MM)		    
+00000000									:END DATE FOR DISCOUNT		4 BYTES	(6 digits BCD, DD.MM.YY)
+0000											:END TIME FOR DISCOUNT		2 BYTES	(4 digits BCD, HH:MM)
+00000000									:FIRST LIMIT FOR DISCOUNT	4 BYTES	BCD
+00000000									:DISCOUNT WITHIN 1ST LIMIT	4 BYTES	BCD
+00000000									:SECOND LIMIT FOR DISCOUNT	4 BYTES	BCD
+00000000									:DISCOUNT WIHTIN 2ND LIMIT	4 BYTES	BCD
+00												:TYPE OF DISCOUNT		1 BYTES	BCD
+00												:TYPE OF MARKDOWN		1 BYTES	BCD
+
+*Notes
+Type of Discount (1 Byte)
+
+Value	Status
+0	No discount
+1	Free item
+2	Unit price discount
+3	Unit price percentage discount
+4	Total price discount
+5	Total price percentage discount
+6	Fixed price discount
+8	Weight percentage publicity
+9	Average weight/pieces publicity
+10	Point system publicity
+11	U.price/pcs - U.price/kg
+12	Weight publicity
+13	Quantity fixed price discount
+
+
+Type of Markdown (1 Byte)
+
+Value	Status
+0	No markdown
+1	Unit price markdown
+2	Price markdown
+3	Unit price and price markdown
+
+'************************************************************
+150DD1BCC8F3C0B0B3A6353030BFCB0C				:COMMODITY		1-412 Bytes	ASCII	
+'*********************COMMODITY*******************************	
+150DD1BCC8F3C0B0B3A6353030BFCB0C
+'解释
+15																			:Font		1 Bytes		HEX
+0D																			:NAME Size	1 Bytes		HEX
+D1BCC8F3C0B0B3A6353030BFCB							:COMMODITY NAME	206 Bytes	ASCII
+0C																			:End Tag	1 Bytes		ASCII
+'************************************************************
+
+14000C																	:INGREDIENT		1-1545 Bytes	ASCII		
+14000C																	:SPECIAL MESSAGE	1-3090 Bytes	ASCII
+00																			:BCC			1 Byte		BCD
+
+'注: PLU 的字节数(长度)的多少，完全取决于 Status2,Status2B
+COMMODITY;INGREDIENT;SPECIAL MESSAGE 的结构相同

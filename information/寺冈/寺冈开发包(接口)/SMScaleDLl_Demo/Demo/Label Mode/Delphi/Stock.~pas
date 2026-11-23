@@ -1,0 +1,35 @@
+unit Stock;
+
+interface
+
+uses
+  Classes;
+
+type
+
+  StockRecord = record
+    RecordNo: Integer; //RECORD NO.         -  4 BYTES (BCD)
+    RecordSize: Integer; //RECORD SIZE        -  2 BYTES (HEX)
+    Time: Integer; //TIME               -  2 BYTES (BCD) (HHMM)
+    Date: Integer; //DATE               -  3 BYTES (BCD) (DDMMYY)
+    Dummy1: Integer; //DUMMY              -  1 BYTE
+    ScaleNo: Integer; //SCALE NO           -  4 BYTES (6BCD)
+    PluNo: Integer; //PLU NO             -  4 BYTES (BCD)
+    WeightOrQTY: Integer; //WEIGHT/ QUANTITY   -  4 BYTES (BCD)
+    ListNo: Integer; //LIST NO            -  2 BYTES (BCD)
+    ItemType: Integer; //ITEM TYPE          -  1 BYTE  (HEX)
+    StockType: Integer; //STOCK TYPE         -  1 BYTE  (HEX)
+    Status: Integer; //STATUS             -  1 BYTE  (HEX)
+    RtReason: Integer; //RETURN REASON      -  1 BYTE  (HEX)
+    InboundNo: array[0..25] of char; //INBOUNDNO          -  13 BYTES (ASCII 12 Chars )
+    Reserved: array[0..73] of char; //RESERVED           -  37 BYTES
+  end;
+
+  PStockRecord = ^StockRecord;
+
+  StockDelRecords = array of Integer;
+  
+implementation
+
+end.
+

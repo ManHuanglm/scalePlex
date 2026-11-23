@@ -1,0 +1,27 @@
+unit PreSetKey;
+
+interface
+uses
+  Classes;
+
+type
+  PSKey= record
+    RecordNo: Integer;        //¼ÇÂ¼±àºÅ
+    RecSize: Integer;
+    PageNo: Integer;         //Ò³±àºÅ
+    KeyNo: Integer;          //¼ü±àºÅ
+    KeySwitchNo: Integer;    //¼üÄÚÈÝ
+    Status: Integer;
+    CSize: Integer;
+    PSKName: array[0..23] of Char;
+    ReferFile :Integer;
+  end;
+
+  PPSKey = ^PSKey;
+
+implementation
+
+
+end.
+
+ 

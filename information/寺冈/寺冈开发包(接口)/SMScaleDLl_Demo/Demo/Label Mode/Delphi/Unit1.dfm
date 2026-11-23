@@ -1,0 +1,376 @@
+object Form1: TForm1
+  Left = 255
+  Top = 154
+  Caption = 'Form1'
+  ClientHeight = 499
+  ClientWidth = 690
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'MS Sans Serif'
+  Font.Style = []
+  OldCreateOrder = False
+  OnCreate = FormCreate
+  PixelsPerInch = 96
+  TextHeight = 13
+  object lbl1: TLabel
+    Left = 8
+    Top = 16
+    Width = 105
+    Height = 17
+    Alignment = taRightJustify
+    AutoSize = False
+    Caption = #30005#23376#31204'IP'#22320#22336':'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -13
+    Font.Name = 'MS Sans Serif'
+    Font.Style = []
+    ParentFont = False
+  end
+  object lblStatus: TLabel
+    Left = 16
+    Top = 56
+    Width = 97
+    Height = 17
+    Alignment = taRightJustify
+    AutoSize = False
+    Caption = #36827#24230':'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -13
+    Font.Name = 'MS Sans Serif'
+    Font.Style = []
+    ParentFont = False
+  end
+  object lbl2: TLabel
+    Left = 280
+    Top = 16
+    Width = 161
+    Height = 17
+    Alignment = taRightJustify
+    AutoSize = False
+    Caption = #38656#35201#25805#20316#30340#35760#24405#32534#21495':'
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -13
+    Font.Name = 'MS Sans Serif'
+    Font.Style = []
+    ParentFont = False
+    Visible = False
+  end
+  object edt1: TEdit
+    Left = 120
+    Top = 56
+    Width = 153
+    Height = 24
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -13
+    Font.Name = 'MS Sans Serif'
+    Font.Style = []
+    ParentFont = False
+    TabOrder = 2
+  end
+  object edt2: TEdit
+    Left = 447
+    Top = 13
+    Width = 153
+    Height = 24
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -13
+    Font.Name = 'MS Sans Serif'
+    Font.Style = []
+    ParentFont = False
+    TabOrder = 0
+    Visible = False
+  end
+  object jvpdrsScaleIP: TJvIPAddress
+    Left = 120
+    Top = 16
+    Width = 154
+    Height = 21
+    AddressValues.Address = 0
+    AddressValues.Value1 = 0
+    AddressValues.Value2 = 0
+    AddressValues.Value3 = 0
+    AddressValues.Value4 = 0
+    ParentColor = False
+    TabOrder = 1
+    Text = '0.0.0.0'
+  end
+  object grp1: TGroupBox
+    Left = 16
+    Top = 88
+    Width = 401
+    Height = 385
+    Caption = #22522#26412#20449#24687
+    TabOrder = 3
+    object btnSendPLU: TButton
+      Left = 8
+      Top = 24
+      Width = 113
+      Height = 33
+      Caption = #19979#20256'PLU('#25910#25454#25968#25454')'
+      TabOrder = 0
+      OnClick = btnSendPLUClick
+    end
+    object btn2: TButton
+      Left = 136
+      Top = 24
+      Width = 113
+      Height = 33
+      Caption = #35835#21462'PLU('#25910#25454#20449#24687')'
+      TabOrder = 1
+      OnClick = btn2Click
+    end
+    object btn18: TButton
+      Left = 8
+      Top = 64
+      Width = 113
+      Height = 33
+      Caption = #19979#20256'PLU('#26631#31614#25968#25454')'
+      TabOrder = 2
+      OnClick = btn18Click
+    end
+    object btn3: TButton
+      Left = 136
+      Top = 64
+      Width = 113
+      Height = 33
+      Caption = #35835#21462'PLU('#26631#31614#20449#24687')'
+      TabOrder = 3
+      OnClick = btn3Click
+    end
+    object btn6: TBitBtn
+      Left = 8
+      Top = 104
+      Width = 113
+      Height = 33
+      Caption = #19979#20256#31204#23494#30721
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 4
+      OnClick = btn6Click
+    end
+    object btn5: TBitBtn
+      Left = 136
+      Top = 104
+      Width = 113
+      Height = 33
+      Caption = #35835#21462#31204#23494#30721
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 5
+      OnClick = btn5Click
+    end
+    object btn7: TBitBtn
+      Left = 136
+      Top = 263
+      Width = 113
+      Height = 33
+      Caption = #21024#38500#31204#23494#30721
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 6
+      OnClick = btn7Click
+    end
+    object btn8: TBitBtn
+      Left = 8
+      Top = 144
+      Width = 113
+      Height = 33
+      Caption = #19979#20256#39044#35774#38190
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 7
+      OnClick = btn8Click
+    end
+    object btn9: TBitBtn
+      Left = 136
+      Top = 144
+      Width = 113
+      Height = 33
+      Caption = #35835#21462#39044#35774#38190
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 8
+      OnClick = btn9Click
+    end
+    object btn10: TBitBtn
+      Left = 136
+      Top = 185
+      Width = 113
+      Height = 33
+      Caption = #21024#38500#39044#35774#38190#25991#20214
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 9
+      OnClick = btn10Click
+    end
+    object btn17: TBitBtn
+      Left = 7
+      Top = 184
+      Width = 114
+      Height = 33
+      Caption = #19979#20256#33258#23450#20041#26465#30721
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 10
+      OnClick = btn17Click
+    end
+    object btn15: TBitBtn
+      Left = 7
+      Top = 224
+      Width = 114
+      Height = 33
+      Caption = #19979#20256#24215#21517#25991#20214
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 11
+      OnClick = btn15Click
+    end
+    object btn16: TBitBtn
+      Left = 135
+      Top = 224
+      Width = 114
+      Height = 33
+      Caption = #35835#24215#21517#25991#20214
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 12
+      OnClick = btn16Click
+    end
+    object btnSyncDT: TBitBtn
+      Left = 7
+      Top = 264
+      Width = 114
+      Height = 33
+      Caption = #26102#38388#21516#27493
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 13
+      OnClick = btnSyncDTClick
+    end
+    object btn1: TBitBtn
+      Left = 136
+      Top = 302
+      Width = 114
+      Height = 33
+      Caption = #21024#38500#26631#31614#25171#21360#20449#24687#25968#25454
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 14
+      OnClick = btn1Click
+    end
+    object btnPLUTTLTrace: TBitBtn
+      Left = 8
+      Top = 304
+      Width = 113
+      Height = 33
+      Caption = #22238#25910#26631#31614#25171#21360#20449#24687
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 15
+      OnClick = btnPLUTTLTraceClick
+    end
+    object btn11: TBitBtn
+      Left = 8
+      Top = 343
+      Width = 113
+      Height = 34
+      Caption = #19979#20256#36861#28335#30721#20449#24687
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 16
+      OnClick = btn11Click
+    end
+  end
+  object grp2: TGroupBox
+    Left = 424
+    Top = 88
+    Width = 249
+    Height = 385
+    Caption = #25253#34920
+    TabOrder = 4
+    object btnReadSaleDetail: TBitBtn
+      Left = 15
+      Top = 24
+      Width = 90
+      Height = 33
+      Caption = #22238#25910#38144#21806#26126#32454
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 0
+      OnClick = btnReadSaleDetailClick
+    end
+    object btnDelSaleDetail: TBitBtn
+      Left = 111
+      Top = 24
+      Width = 90
+      Height = 33
+      Caption = #21024#38500#38144#21806#26126#32454
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 1
+      OnClick = btnDelSaleDetailClick
+    end
+    object btnReadSaleTotal: TBitBtn
+      Left = 15
+      Top = 64
+      Width = 90
+      Height = 33
+      Caption = #22238#25910#38144#21806#21512#35745
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 2
+      OnClick = btnReadSaleTotalClick
+    end
+    object btnDelSaleTotal: TBitBtn
+      Left = 111
+      Top = 64
+      Width = 90
+      Height = 33
+      Caption = #21024#38500#38144#21806#21512#35745
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 3
+      OnClick = btnDelSaleTotalClick
+    end
+    object btn19: TBitBtn
+      Left = 15
+      Top = 144
+      Width = 90
+      Height = 33
+      Caption = #35835#24215#38138#26085#25253#34920
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 4
+      OnClick = btn19Click
+    end
+    object btnReadStock: TBitBtn
+      Left = 15
+      Top = 104
+      Width = 90
+      Height = 33
+      Caption = #22238#25910#24211#23384#25968#25454
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 5
+      OnClick = btnReadStockClick
+    end
+    object btnDelStock: TBitBtn
+      Left = 112
+      Top = 103
+      Width = 89
+      Height = 34
+      Caption = #21024#38500#24211#23384#25968#25454
+      DoubleBuffered = True
+      ParentDoubleBuffered = False
+      TabOrder = 6
+      OnClick = btnDelStockClick
+    end
+  end
+end
