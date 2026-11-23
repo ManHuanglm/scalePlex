@@ -65,7 +65,10 @@ object AclasBridge {
         val ok: Boolean get() = online && ret == 0 && lastError == 0
     }
 
-    fun toolsPath(): String = System.getProperty(TOOLS_PATH_PROPERTY, "")
+    fun toolsPath(): String = System.getProperty(TOOLS_PATH_PROPERTY, "").ifBlank {
+        val tools = System.getProperty("scaleplex.tools.dir", "")
+        if (tools.isNotBlank()) File(tools, "aclas").absolutePath else ""
+    }
 
     fun isConfigured(): Boolean = toolsPath().isNotBlank() && File(toolsPath(), DLL_NAME).exists()
 

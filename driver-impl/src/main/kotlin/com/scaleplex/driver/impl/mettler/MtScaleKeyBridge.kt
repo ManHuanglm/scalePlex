@@ -25,6 +25,7 @@ object MtScaleKeyBridge {
 
     const val DLL_PATH_PROPERTY = "scaleplex.mt.dll"
     const val DEFAULT_DLL_PATH = "C:\\MTScaleKey\\MTScaleAPI\\MTScaleAPI.dll"
+    const val DLL_NAME = "MTScaleAPI.dll"
 
     /** 32 位 PowerShell（64 位 Windows 必有；32 位系统直接用系统 PowerShell）。 */
     private fun powershell32(): File {
@@ -32,7 +33,16 @@ object MtScaleKeyBridge {
         return if (wow.exists()) wow else File("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe")
     }
 
-    fun dllPath(): String = System.getProperty(DLL_PATH_PROPERTY, DEFAULT_DLL_PATH)
+    fun dllPath(): String {
+        System.getProperty(DLL_PATH_PROPERTY, "").takeIf { it.isNotBlank() }?.let { return it }
+        // 内置工具链兜底：<dataDir>/tools/mettler/MTScaleAPI.dll（见 Main.kt ToolsDeployer）
+        val tools = System.getProperty("scaleplex.tools.dir", "")
+        if (tools.isNotBlank()) {
+            val deployed = File(tools, "mettler\\$DLL_NAME").takeIf { it.exists() }
+            if (deployed != null) return deployed.absolutePath
+        }
+        return DEFAULT_DLL_PATH
+    }
 
     /**
      * 以文件方式执行一次 MTScaleKey 任务。

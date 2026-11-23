@@ -50,7 +50,10 @@ object DahuaBridge {
         else -> "错误码 $code"
     }
 
-    fun toolsPath(): String = System.getProperty(TOOLS_PATH_PROPERTY, "")
+    fun toolsPath(): String = System.getProperty(TOOLS_PATH_PROPERTY, "").ifBlank {
+        val tools = System.getProperty("scaleplex.tools.dir", "")
+        if (tools.isNotBlank()) File(tools, "dahua").absolutePath else ""
+    }
 
     fun isConfigured(): Boolean = toolsPath().isNotBlank() && File(toolsPath(), DLL_NAME).exists()
 

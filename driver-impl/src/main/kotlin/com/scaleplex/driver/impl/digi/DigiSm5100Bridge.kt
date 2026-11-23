@@ -41,12 +41,15 @@ object DigiSm5100Bridge {
         val recordCount: Int = 0,
     )
 
-    fun toolsPath(): String = System.getProperty("scaleplex.digi.tools", "")
+    fun toolsPath(): String = System.getProperty("scaleplex.digi.tools", "").ifBlank {
+        val tools = System.getProperty("scaleplex.tools.dir", "")
+        if (tools.isNotBlank()) File(tools, "digi").absolutePath else ""
+    }
 
     fun dllPath(): File? {
         val tools = toolsPath()
         if (tools.isBlank()) return null
-        // SM5100DLL&Demo 目录优先，其次工具目录根
+        // SM5100DLL&Demo 目录优先（用户自备工具目录），其次工具目录根（内置释放布局）
         val sub = File(tools, DLL_SUBDIR)
         val inSub = File(sub, DLL_NAME)
         return when {

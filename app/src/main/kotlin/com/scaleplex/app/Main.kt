@@ -20,11 +20,21 @@ import java.io.File
 /**
  * Application entry point. Boots the database, services and driver registry, then
  * opens the Compose Desktop main window.
+ *
+ * 便携化数据目录：优先使用工作目录下 `data/`（便携版 exe 旁，随目录携带），
+ * 不可写时回退 `~/.scaleplex`。内置官方工具链（各品牌 DLL/EXE 资源）释放到
+ * `data/tools/<brand>/`，驱动桥接默认即用，无需手动配置工具目录。
  */
 fun main() {
     DriverRegistry.install()
 
-    val dataDir = File(System.getProperty("user.home"), ".scaleplex").apply { mkdirs() }
+    val portable = File(System.getProperty("user.dir"), "data")
+    val dataDir = if (usable(portable)) portable
+    else File(System.getProperty("user.home"), ".scaleplex").apply { mkdirs() }
+    System.setProperty("scaleplex.data.dir", dataDir.absolutePath)
+    val toolsDir = ToolsDeployer.deploy(dataDir)
+    System.setProperty("scaleplex.tools.dir", toolsDir.absolutePath)
+
     val db = Database(File(dataDir, "scaleplex.db"))
 
     val configService = ConfigService(db)
@@ -54,4 +64,11 @@ fun main() {
             }
         }
     }
+}
+
+/** 判断目录可用于便携数据（可创建且可写）。 */
+private fun usable(dir: File): Boolean = try {
+    dir.mkdirs() && dir.isDirectory && dir.canWrite()
+} catch (_: Exception) {
+    false
 }

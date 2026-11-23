@@ -25,7 +25,11 @@ object DigiToolsBridge {
     /** PLU 文件号：25H（见 PLU_FILE.TXT）。 */
     const val PLU_FILE_NO = 0x25
 
-    fun toolsPath(): String = System.getProperty(TOOLS_PATH_PROPERTY, "")
+    fun toolsPath(): String = System.getProperty(TOOLS_PATH_PROPERTY, "").ifBlank {
+        // 内置工具链兜底：应用启动时释放到 <dataDir>/tools/digi（见 Main.kt ToolsDeployer）
+        val tools = System.getProperty("scaleplex.tools.dir", "")
+        if (tools.isNotBlank()) File(tools, "digi").absolutePath else ""
+    }
 
     fun isConfigured(): Boolean = toolsPath().isNotBlank() && File(toolsPath(), "TWS.exe").exists()
 
