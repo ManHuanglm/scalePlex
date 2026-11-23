@@ -35,6 +35,7 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
     var groupEditing by remember { mutableStateOf<ScaleGroup?>(null) }
     var showGroupEditor by remember { mutableStateOf(false) }
     var batchResults by remember { mutableStateOf<Map<Long, com.scaleplex.core.model.BatchResult>?>(null) }
+    val checked = remember { mutableStateListOf<Long>() }
     val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -73,8 +74,23 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
         }
 
         // ---- 设备工具栏 ----
-        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(tr("tab.devices"), Modifier.weight(1f), fontSize = 18.sp)
+            Text(
+                tr("plu.checkedCount") + " ${checked.size}",
+                fontSize = 12.sp, color = androidx.compose.ui.graphics.Color(0xFF808080),
+            )
+            Spacer(Modifier.width(8.dp))
+            // 批量下发（参考银豹：勾选多台秤批量下发商品资料）
+            Button(onClick = {
+                scope.launch {
+                    val targets = devices.filter { checked.contains(it.id) }.ifEmpty { devices }
+                    batchResults = state.scaleService.downloadToDevices(
+                        targets, state.pluService.all(),
+                    )
+                }
+            }) { Text(tr("device.downloadSelected")) }
+            Spacer(Modifier.width(8.dp))
             Button(onClick = {
                 editing = ScaleDevice(name = "", brand = ScaleBrand.DIGI, groupId = groupFilter ?: 0)
                 showEditor = true
@@ -86,12 +102,22 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
                 }
             }) { Text(tr("device.syncTime")) }
         }
+        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+            Text(
+                tr("device.batchHint"),
+                fontSize = 11.sp, color = androidx.compose.ui.graphics.Color(0xFF808080),
+            )
+        }
         LazyColumn(modifier = Modifier.weight(1f)) {
             items(devices, key = { it.id }) { d ->
                 val rt = state.deviceRuntimes[d.id]
                 val status = rt?.status?.name ?: "UNKNOWN"
                 val groupName = groups.firstOrNull { it.id == d.groupId }?.name ?: tr("group.none")
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = checked.contains(d.id),
+                        onCheckedChange = { c -> if (c) checked.add(d.id) else checked.remove(d.id) },
+                    )
                     Column(Modifier.weight(1f)) {
                         Text("${d.name} · ${d.brand.displayName} · [$groupName]", fontSize = 14.sp)
                         Text("${d.commType} ${d.ip}:${d.port}  [${status}]", fontSize = 11.sp)

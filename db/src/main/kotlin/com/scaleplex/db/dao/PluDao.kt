@@ -13,12 +13,13 @@ class PluDao(private val db: Database) {
 
     fun insert(p: PluItem): Long = db.withDb { c ->
         c.insert(
-            """INSERT INTO plu (plu_no,name,name_en,weight_flag,main_group,unit_price,cost,tare,qty,
+            """INSERT INTO plu (plu_no,name,name_en,weight_flag,unit,main_group,unit_price,member_price,special_price,cost,tare,qty,
                 barcode_type,barcode_format,flag_data,bar_right_data_type,ean_code,multi_barcode,
                 used_by_date,sell_by_date,packed_date,label1_format,label2_format,place_no,tax_rate_no,
                 commodity_json,ingredient_json,special_msg_json,label_template_id,hot_key,enabled,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            p.pluNo, p.name, p.nameEn, p.weightFlag, p.mainGroup, p.unitPrice, p.cost, p.tare, p.qty,
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            p.pluNo, p.name, p.nameEn, p.weightFlag, p.unit, p.mainGroup, p.unitPrice, p.memberPrice, p.specialPrice,
+            p.cost, p.tare, p.qty,
             p.barcodeType, p.barcodeFormat, p.flagData, p.barRightDataType, p.eanCode, p.multiBarcode,
             p.usedByDate, p.sellByDate, p.packedDate, p.label1Format, p.label2Format, p.placeNo, p.taxRateNo,
             JsonCodec.writeTextLines(p.commodityLines), JsonCodec.writeTextLines(p.ingredientLines),
@@ -29,12 +30,13 @@ class PluDao(private val db: Database) {
 
     fun update(p: PluItem): Int = db.withDb { c ->
         c.exec(
-            """UPDATE plu SET name=?,name_en=?,weight_flag=?,main_group=?,unit_price=?,cost=?,tare=?,qty=?,
+            """UPDATE plu SET name=?,name_en=?,weight_flag=?,unit=?,main_group=?,unit_price=?,member_price=?,special_price=?,cost=?,tare=?,qty=?,
                 barcode_type=?,barcode_format=?,flag_data=?,bar_right_data_type=?,ean_code=?,multi_barcode=?,
                 used_by_date=?,sell_by_date=?,packed_date=?,label1_format=?,label2_format=?,place_no=?,tax_rate_no=?,
                 commodity_json=?,ingredient_json=?,special_msg_json=?,label_template_id=?,hot_key=?,enabled=?,updated_at=?
                 WHERE plu_no=?""",
-            p.name, p.nameEn, p.weightFlag, p.mainGroup, p.unitPrice, p.cost, p.tare, p.qty,
+            p.name, p.nameEn, p.weightFlag, p.unit, p.mainGroup, p.unitPrice, p.memberPrice, p.specialPrice,
+            p.cost, p.tare, p.qty,
             p.barcodeType, p.barcodeFormat, p.flagData, p.barRightDataType, p.eanCode, p.multiBarcode,
             p.usedByDate, p.sellByDate, p.packedDate, p.label1Format, p.label2Format, p.placeNo, p.taxRateNo,
             JsonCodec.writeTextLines(p.commodityLines), JsonCodec.writeTextLines(p.ingredientLines),
@@ -96,8 +98,11 @@ class PluDao(private val db: Database) {
         name = rs.getString("name") ?: "",
         nameEn = rs.getString("name_en") ?: "",
         weightFlag = rs.getInt("weight_flag"),
+        unit = rs.getInt("unit"),
         mainGroup = rs.getInt("main_group"),
         unitPrice = rs.getLong("unit_price"),
+        memberPrice = rs.getLong("member_price"),
+        specialPrice = rs.getLong("special_price"),
         cost = rs.getLong("cost"),
         tare = rs.getInt("tare"),
         qty = rs.getInt("qty"),

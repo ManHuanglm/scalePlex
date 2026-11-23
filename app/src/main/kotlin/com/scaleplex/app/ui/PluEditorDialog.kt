@@ -71,18 +71,35 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                 }
                 // ---- 商品名称 ----
                 Field(tr("plu.field.name"), plu.name, Modifier.fillMaxWidth()) { plu = plu.copy(name = it) }
-                // ---- 商品类型 ----
+                // ---- 商品类型 / 计价单位 ----
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(tr("plu.field.type"), Modifier.width(90.dp))
                     var typeExpanded by remember { mutableStateOf(false) }
                     OutlinedTextField(
                         value = if (plu.weightFlag == 1) tr("plu.weight.count") else tr("plu.weight.weigh"),
-                        onValueChange = {}, readOnly = true, modifier = Modifier.width(160.dp),
+                        onValueChange = {}, readOnly = true, modifier = Modifier.width(140.dp),
                         trailingIcon = { TextButton(onClick = { typeExpanded = true }) { Text("▾") } },
                     )
                     DropdownMenu(typeExpanded, { typeExpanded = false }) {
                         DropdownMenuItem(onClick = { plu = plu.copy(weightFlag = 0); typeExpanded = false }) { Text(tr("plu.weight.weigh")) }
                         DropdownMenuItem(onClick = { plu = plu.copy(weightFlag = 1); typeExpanded = false }) { Text(tr("plu.weight.count")) }
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Text(tr("plu.unit"), Modifier.width(80.dp))
+                    var unitExpanded by remember { mutableStateOf(false) }
+                    OutlinedTextField(
+                        value = com.scaleplex.core.model.PluUnit.fromId(plu.unit).label,
+                        onValueChange = {}, readOnly = true, modifier = Modifier.width(140.dp),
+                        trailingIcon = { TextButton(onClick = { unitExpanded = true }) { Text("▾") } },
+                    )
+                    DropdownMenu(unitExpanded, { unitExpanded = false }) {
+                        com.scaleplex.core.model.PluUnit.entries.forEach { u ->
+                            DropdownMenuItem(onClick = {
+                                // 计数(PCS) 与 计件 标志联动
+                                plu = plu.copy(unit = u.id, weightFlag = if (u == com.scaleplex.core.model.PluUnit.PCS) 1 else 0)
+                                unitExpanded = false
+                            }) { Text(u.label) }
+                        }
                     }
                 }
                 // ---- 成分 / 特殊信息 ----
@@ -115,6 +132,14 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                     }
                     Field(tr("plu.hotkey"), if (plu.hotKey > 0) plu.hotKey.toString() else "", Modifier.fillMaxWidth()) { s ->
                         s.toIntOrNull()?.let { plu = plu.copy(hotKey = it.coerceIn(0, 999)) }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Field(tr("plu.memberPrice"), Numbers.minorToDisplay(plu.memberPrice, state.config.priceDecimals), Modifier.weight(1f)) {
+                            plu = plu.copy(memberPrice = Numbers.displayToMinor(it, state.config.priceDecimals))
+                        }
+                        Field(tr("plu.specialPrice"), Numbers.minorToDisplay(plu.specialPrice, state.config.priceDecimals), Modifier.weight(1f)) {
+                            plu = plu.copy(specialPrice = Numbers.displayToMinor(it, state.config.priceDecimals))
+                        }
                     }
                     var labelExpanded by remember { mutableStateOf(false) }
                     OutlinedTextField(

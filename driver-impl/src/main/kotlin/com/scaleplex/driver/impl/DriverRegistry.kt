@@ -5,6 +5,7 @@ import com.scaleplex.driver.api.ScaleDriverFactory
 import com.scaleplex.driver.impl.dahua.DahuaTcpDriver
 import com.scaleplex.driver.impl.digi.DigiSmDriver
 import com.scaleplex.driver.impl.hihong.HiHongUdpDriver
+import com.scaleplex.driver.impl.mettler.MettlerToledoDriver
 import com.scaleplex.driver.impl.yousheng.YouShengDriver
 
 /**
@@ -24,6 +25,8 @@ object DriverRegistry {
             ScaleDriverFactory.register(ScaleBrand.DAHUA) { device -> DahuaTcpDriver(device) }
             ScaleDriverFactory.register(ScaleBrand.HIHONG) { device -> HiHongUdpDriver(device) }
             ScaleDriverFactory.register(ScaleBrand.YOUSHENG) { device -> YouShengDriver(device) }
+            // 托利多骨架驱动：仅注册品牌避免选择后崩溃，协议待实体秤联调
+            ScaleDriverFactory.register(ScaleBrand.METTLER_TOLEDO) { device -> MettlerToledoDriver(device) }
             installed = true
         }
     }
