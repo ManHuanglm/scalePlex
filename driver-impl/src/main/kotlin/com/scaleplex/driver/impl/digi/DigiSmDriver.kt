@@ -155,6 +155,14 @@ class DigiSmDriver(
         return out.toByteArray()
     }
 
-    override suspend fun downloadLabelTemplate(template: LabelTemplate): Result<Unit> =
-        Result.failure(UnsupportedOperationException("DIGI label download pending field capture"))
+    override suspend fun downloadLabelTemplate(template: LabelTemplate): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            // 标签格式编号收敛到 DIGI 格式表范围（1..24，对应 T1..F8）
+            val formatNo = template.id.toInt().coerceIn(DigiLabelEncoder.FORMAT_NO_MIN, DigiLabelEncoder.FORMAT_NO_MAX)
+            val record = DigiLabelEncoder.encode(template, formatNo)
+            transport.request(frame(OpCode.DOWNLOAD_LABEL, record))
+                ?: error("No ACK from scale for label format $formatNo")
+            Unit
+        }
+    }
 }

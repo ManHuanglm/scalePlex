@@ -3,6 +3,7 @@ package com.scaleplex.service
 import com.scaleplex.core.model.BatchResult
 import com.scaleplex.core.model.DeviceStatus
 import com.scaleplex.core.model.DeviceRuntime
+import com.scaleplex.core.model.LabelTemplate
 import com.scaleplex.core.model.PluItem
 import com.scaleplex.core.model.ScaleDevice
 import com.scaleplex.core.model.ScaleGroup
@@ -107,6 +108,40 @@ class ScaleService(db: Database) {
     /** Push PLUs to every scale in a group. */
     suspend fun downloadToGroup(groupId: Long, plus: List<PluItem>): Map<Long, BatchResult> =
         downloadToDevices(devicesInGroup(groupId), plus)
+
+    /**
+     * Push a label template to a set of devices concurrently, mirroring [downloadToDevices]
+     * result semantics (one [BatchResult] per device, single record).
+     */
+    suspend fun downloadLabelToDevices(
+        devices: Collection<ScaleDevice>,
+        template: LabelTemplate,
+        maxConcurrency: Int = 4,
+    ): Map<Long, BatchResult> = coroutineScope {
+        val sem = Semaphore(maxConcurrency)
+        devices.map { device ->
+            async(Dispatchers.IO) {
+                sem.withPermit {
+                    val drv = driverFor(device)
+                    val connected = drv.connect().isSuccess
+                    if (!connected) {
+                        device.id to BatchResult(total = 1, failed = 1,
+                            errors = listOf(com.scaleplex.core.model.BatchError(device.id, null, "connect failed")))
+                    } else {
+                        val r = drv.downloadLabelTemplate(template).fold(
+                            onSuccess = { BatchResult.ok(total = 1) },
+                            onFailure = { BatchResult.single(com.scaleplex.core.model.BatchError(device.id, null, it.message ?: "error")) },
+                        )
+                        device.id to r
+                    }
+                }
+            }
+        }.awaitAll().toMap()
+    }
+
+    /** Push a label template to every scale in a group. */
+    suspend fun downloadLabelToGroup(groupId: Long, template: LabelTemplate): Map<Long, BatchResult> =
+        downloadLabelToDevices(devicesInGroup(groupId), template)
 
     suspend fun syncTime(device: ScaleDevice): Result<Unit> = driverFor(device).syncTime()
 }
