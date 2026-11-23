@@ -77,10 +77,16 @@ fun LabelCanvas(
 ) {
     val focusRequester = remember { FocusRequester() }
     BoxWithConstraints(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        val pxPerMm = if (oneToOne) 8f else minOf(
-            (maxWidth.value - 20f) / template.widthMm.coerceAtLeast(1),
-            (maxHeight.value - 20f) / template.heightMm.coerceAtLeast(1),
-        )
+        // Dialog 首帧可能以 0 尺寸测量，pxPerMm 必须收敛为正数，否则 .size(负数) 触发约束崩溃
+        val pxPerMm = if (oneToOne) 8f else {
+            val fit = minOf(
+                (maxWidth.value - 20f) / template.widthMm.coerceAtLeast(1),
+                (maxHeight.value - 20f) / template.heightMm.coerceAtLeast(1),
+            )
+            fit.coerceAtLeast(1f)
+        }
+        val paperWidth = (template.widthMm * pxPerMm).dp.coerceAtLeast(1.dp)
+        val paperHeight = (template.heightMm * pxPerMm).dp.coerceAtLeast(1.dp)
         Column(horizontalAlignment = Alignment.Start) {
             if (!preview) {
                 TopRuler(template.widthMm, pxPerMm)
@@ -91,7 +97,7 @@ fun LabelCanvas(
                 }
                 Surface(
                     modifier = Modifier
-                        .size((template.widthMm * pxPerMm).dp, (template.heightMm * pxPerMm).dp)
+                        .size(paperWidth, paperHeight)
                         .focusRequester(focusRequester)
                         .focusable()
                         .onPreviewKeyEvent { event ->
