@@ -1,7 +1,6 @@
 package com.scaleplex.driver.impl.digi
 
 import com.scaleplex.communication.Transport
-import com.scaleplex.communication.UdpClient
 import com.scaleplex.core.model.BatchResult
 import com.scaleplex.core.model.BatchError
 import com.scaleplex.core.model.LabelTemplate
@@ -31,8 +30,8 @@ import java.util.Locale
  */
 class DigiSmDriver(
     private val device: ScaleDevice,
-    override val transport: Transport = UdpClient(
-        device.ip, device.port, device.comm, com.scaleplex.communication.CommEventBus(),
+    override val transport: Transport = com.scaleplex.communication.TransportFactory.create(
+        device, com.scaleplex.communication.CommEventBus(),
     ),
 ) : AbstractScaleDriver() {
 
@@ -155,9 +154,6 @@ class DigiSmDriver(
         out.add(0x03)
         return out.toByteArray()
     }
-
-    override suspend fun uploadPlu(): Result<List<PluItem>> =
-        Result.failure(UnsupportedOperationException("DIGI uploadPlu pending field capture"))
 
     override suspend fun downloadLabelTemplate(template: LabelTemplate): Result<Unit> =
         Result.failure(UnsupportedOperationException("DIGI label download pending field capture"))
