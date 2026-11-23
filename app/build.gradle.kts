@@ -31,6 +31,7 @@ compose.desktop {
         mainClass = "com.scaleplex.app.MainKt"
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Dmg, TargetFormat.Deb)
+            modules("java.naming", "java.sql", "java.management", "jdk.unsupported")
             packageName = "ScalePlex"
             packageVersion = "1.0.0"
             vendor = "ScalePlex"
