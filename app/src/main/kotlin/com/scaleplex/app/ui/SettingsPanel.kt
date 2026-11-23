@@ -109,6 +109,24 @@ fun SettingsPanel(state: AppState, refresh: MutableState<Int>) {
             }) { Text(tr("common.ok")) }
         }
 
+        // 寺冈工具目录（TWS.exe/SMScale.dll/SM.ini/Desc）
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(tr("settings.digiTools"), Modifier.width(160.dp))
+            OutlinedTextField(
+                cfg.digiToolsPath, { cfg = cfg.copy(digiToolsPath = it) },
+                modifier = Modifier.weight(1f),
+                label = { Text(tr("settings.digiToolsHint")) },
+            )
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = {
+                val chooser = JFileChooser()
+                chooser.fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+                if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                    cfg = cfg.copy(digiToolsPath = chooser.selectedFile.absolutePath)
+                }
+            }) { Text(tr("common.ok")) }
+        }
+
         // Theme
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("深色模式 / Dark mode", Modifier.width(160.dp))

@@ -63,4 +63,6 @@ data class ScaleConfig(
     val barcodeFormat: Int = 0,
     /** MTScaleKey 接口 DLL 路径（托利多驱动桥接调用），空 = 默认 C:\MTScaleKey\MTScaleAPI\MTScaleAPI.dll。 */
     val mtApiDllPath: String = "",
+    /** 寺冈工具目录（TWS.exe/SMScale.dll/SM.ini/Desc），DIGI 驱动桥接调用。 */
+    val digiToolsPath: String = "",
 )

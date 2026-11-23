@@ -33,10 +33,14 @@ class ConfigService(db: Database) {
             autoDownload = g("autoDownload", "false").toBoolean(),
             barcodeFormat = (g("barcodeFormat", "0")).toIntOrNull() ?: 0,
             mtApiDllPath = g("mtApiDllPath", ""),
+            digiToolsPath = g("digiToolsPath", ""),
         )
-        // 启动时同步托利多 MTScaleKey DLL 路径
+        // 启动时同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS）
         if (config.mtApiDllPath.isNotBlank()) {
             System.setProperty("scaleplex.mt.dll", config.mtApiDllPath)
+        }
+        if (config.digiToolsPath.isNotBlank()) {
+            System.setProperty("scaleplex.digi.tools", config.digiToolsPath)
         }
         return config
     }
@@ -57,9 +61,13 @@ class ConfigService(db: Database) {
         dao.put("autoDownload", cfg.autoDownload.toString())
         dao.put("barcodeFormat", cfg.barcodeFormat.toString())
         dao.put("mtApiDllPath", cfg.mtApiDllPath)
-        // 托利多 MTScaleKey DLL 路径同步给桥接器（本模块内可见 driver-impl）
+        dao.put("digiToolsPath", cfg.digiToolsPath)
+        // 同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS）
         if (cfg.mtApiDllPath.isNotBlank()) {
             System.setProperty("scaleplex.mt.dll", cfg.mtApiDllPath)
+        }
+        if (cfg.digiToolsPath.isNotBlank()) {
+            System.setProperty("scaleplex.digi.tools", cfg.digiToolsPath)
         }
         applyLocale(cfg.language)
     }

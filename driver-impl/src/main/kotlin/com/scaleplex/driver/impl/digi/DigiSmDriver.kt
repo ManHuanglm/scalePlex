@@ -1,8 +1,8 @@
 package com.scaleplex.driver.impl.digi
 
 import com.scaleplex.communication.Transport
-import com.scaleplex.core.model.BatchResult
 import com.scaleplex.core.model.BatchError
+import com.scaleplex.core.model.BatchResult
 import com.scaleplex.core.model.LabelTemplate
 import com.scaleplex.core.model.PluItem
 import com.scaleplex.core.model.ScaleBrand
@@ -12,21 +12,20 @@ import com.scaleplex.driver.api.AbstractScaleDriver
 import com.scaleplex.driver.api.ScaleStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.io.File
 
 /**
- * DIGI 寺冈 SM series driver (UDP). Phase-1, highest priority.
+ * DIGI 寺冈 SM 系列驱动 v2 —— 基于官方工具链（information/寺冈开发包(接口)）：
  *
- * The SM UDP protocol exchanges length-framed records; PLU download follows the
- * CSV-import semantics of the DIGI DLL (`PLU_Demo1.csv`). This implementation
- * reuses [DigiPluCsvCodec] for payload construction and [DigiPluEncoder] for the
- * binary record form, and drives the exchange through a [UdpClient] with retry.
+ * - PLU 下发：`SMScale.dll`（`DownloadPLUtoScales(csv, ips)`，CSV 格式同 PLU_Demo1.csv，
+ *   由 [DigiPluCsvCodec] 生成），32 位 PowerShell 桥接调用，`GetScaleStatus()` 轮询结果；
+ * - 交易流水：`TWS.exe RDFL 81 <ip> <port>`（0x51 销售明细）→ 按
+ *   `SM100_RTRECEIPT_DETAIL.dsc` 字段表解析（[DigiReceiptParser]）；
+ * - 在线探测：`TWS.exe RDR 25 <ip> <port>` 读 PLU 首条记录；
+ * - 清空 PLU：`TWS.exe DELF 25 <ip> <port>`（文件级删除）。
  *
- * Live record-framing offsets differ across SM firmware; the protocol op-codes and
- * record framing constants below are centralized so field capture can refine them
- * without touching the surrounding control flow.
+ * 前置条件：设置页配置寺冈工具目录（含 TWS.exe/SMScale.dll/SM.ini/Desc），系统属性
+ * `scaleplex.digi.tools`。早期猜测的 UDP 二进制帧协议已废弃（未经实体秤验证）。
  */
 class DigiSmDriver(
     private val device: ScaleDevice,
@@ -37,132 +36,84 @@ class DigiSmDriver(
 
     override val brand: ScaleBrand = ScaleBrand.DIGI
 
-    // Protocol op-codes (centralized for firmware-specific tuning).
-    private object OpCode {
-        const val DOWNLOAD_PLU = 0x01
-        const val READ_PLU = 0x02
-        const val DELETE_PLU = 0x03
-        const val DELETE_ALL_PLU = 0x04
-        const val SYNC_TIME = 0x05
-        const val READ_STATUS = 0x06
-        const val READ_TRADE = 0x07
-        const val CLEAR_TRADE = 0x08
-        const val DOWNLOAD_LABEL = 0x09
-    }
-
-    private val timeFmt = SimpleDateFormat("yyMMddHHmmss", Locale.ROOT)
-
-    override suspend fun connect(): Result<Unit> = runCatching {
-        transport.connect()
+    override suspend fun connect(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (!DigiToolsBridge.isConfigured()) {
+                error("寺冈工具目录未配置（系统设置：TWS.exe/SMScale.dll 所在目录）")
+            }
+        }
     }
 
     override suspend fun getStatus(): Result<ScaleStatus> = withContext(Dispatchers.IO) {
         runCatching {
-            val reply = transport.request(frame(OpCode.READ_STATUS, ByteArray(0)))
-                ?: return@runCatching ScaleStatus(online = false)
-            // Reply payload[0] == 1 conventionally means "alive".
-            val online = reply.size > 1 && reply[1].toInt() == 1
-            ScaleStatus(online = online, model = device.model)
+            val online = DigiToolsBridge.checkOnline(device.ip, device.port)
+            ScaleStatus(online = online, model = device.model.ifBlank { "DIGI SM" })
         }
     }
 
     override suspend fun downloadPlu(plu: PluItem): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            val record = DigiPluEncoder.encode(plu, priceDecimals = 2)
-            val payload = frame(OpCode.DOWNLOAD_PLU, record)
-            transport.request(payload) ?: error("No ACK from scale for PLU ${plu.pluNo}")
-            Unit
-        }
+        downloadPluBatch(listOf(plu)).map { }
     }
 
     override suspend fun downloadPluBatch(list: List<PluItem>): Result<BatchResult> = withContext(Dispatchers.IO) {
         runCatching {
-            var success = 0
-            val errors = mutableListOf<BatchError>()
-            for (plu in list) {
-                try {
-                    val record = DigiPluEncoder.encode(plu)
-                    val reply = transport.request(frame(OpCode.DOWNLOAD_PLU, record))
-                    if (reply != null) success++ else errors += BatchError(device.id, plu.pluNo, "No ACK")
-                } catch (t: Throwable) {
-                    errors += BatchError(device.id, plu.pluNo, t.message ?: "error")
+            if (list.isEmpty()) return@runCatching BatchResult.ok(0)
+            val csvFile = File(
+                System.getProperty("java.io.tmpdir"),
+                "scaleplex-digi-plu-${System.currentTimeMillis()}.csv",
+            )
+            csvFile.writeText(DigiPluCsvCodec.writePlus(list).joinToString("\r\n"), Charsets.UTF_8)
+            try {
+                val codeByIp = DigiToolsBridge.downloadPluViaDll(csvFile, listOf(device.ip))
+                val code = codeByIp[device.ip]
+                if (code == null) {
+                    BatchResult(total = list.size, failed = list.size,
+                        errors = listOf(BatchError(device.id, null, "下发结果中缺少本秤（IP ${device.ip}）")))
+                } else if (code == 0) {
+                    BatchResult.ok(list.size)
+                } else {
+                    BatchResult(total = list.size, failed = list.size,
+                        errors = listOf(BatchError(device.id, null, DigiToolsBridge.describeResult(code))))
                 }
+            } finally {
+                csvFile.delete()
             }
-            BatchResult(total = list.size, success = success, failed = list.size - success, errors = errors)
         }
     }
 
-    override suspend fun deletePlu(pluNo: Int): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            val body = byteArrayOf(
-                (pluNo and 0xFF).toByte(),
-                ((pluNo shr 8) and 0xFF).toByte(),
-                ((pluNo shr 16) and 0xFF).toByte(),
-                ((pluNo shr 24) and 0xFF).toByte(),
-            )
-            transport.request(frame(OpCode.DELETE_PLU, body)) ?: error("No ACK deleting PLU $pluNo")
-            Unit
-        }
-    }
+    override suspend fun deletePlu(pluNo: Int): Result<Unit> =
+        // TWS 记录级删除（DELR）按记录位置定位，需要先读取 PLU 文件（回收操作，超出
+        // "资料只能下发不能回收" 约束），单条删除暂不提供；清空请用 deleteAllPlu。
+        Result.failure(UnsupportedOperationException("寺冈单条 PLU 删除暂不支持，请使用清空 PLU"))
 
     override suspend fun deleteAllPlu(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            transport.request(frame(OpCode.DELETE_ALL_PLU, ByteArray(0))) ?: error("No ACK clearing PLU")
-            Unit
+            DigiToolsBridge.deleteFile(DigiToolsBridge.PLU_FILE_NO, device.ip, device.port)
         }
     }
 
     override suspend fun syncTime(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            val now = timeFmt.format(Date())
-            transport.request(frame(OpCode.SYNC_TIME, now.toByteArray(Charsets.US_ASCII)))
-                ?: error("No ACK syncing time")
-            Unit
+            // SMScaleAPI.dll 提供 SyncDateTime(socket)，但为进程内有状态调用；
+            // TWS 命令行无时间同步。时间同步暂未接入。
+            error("寺冈时间同步暂未接入（SMScaleAPI.dll SyncDateTime 需进程内会话）")
         }
     }
 
     override suspend fun readTradeLog(): Result<List<TradeRecord>> = withContext(Dispatchers.IO) {
         runCatching {
-            // Placeholder decode; full record parsing refines with field capture.
-            transport.request(frame(OpCode.READ_TRADE, ByteArray(0)))
-            emptyList<TradeRecord>()
+            DigiToolsBridge.readReceiptDetail(device.ip, device.port, device.id)
         }
     }
 
     override suspend fun clearTradeLog(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            transport.request(frame(OpCode.CLEAR_TRADE, ByteArray(0))) ?: error("No ACK clearing trade log")
-            Unit
+            // 流水清空 = 删除明细文件 0x51
+            DigiToolsBridge.deleteFile(DigiReceiptParser.RECEIPT_DETAIL_FILE_NO, device.ip, device.port)
         }
     }
 
-    /**
-     * Frame a request: STX(0x02) + opCode + length(2 LE) + body + checksum + ETX(0x03).
-     * Checksum is the two's-complement of the sum of opCode+length+body, a common DIGI scheme.
-     */
-    private fun frame(op: Int, body: ByteArray): ByteArray {
-        val len = body.size + 1 // op + body
-        val out = mutableListOf<Byte>()
-        out.add(0x02)
-        out.add(op.toByte())
-        out.add((len and 0xFF).toByte())
-        out.add(((len shr 8) and 0xFF).toByte())
-        body.forEach { out.add(it) }
-        var sum = op + (len and 0xFF) + ((len shr 8) and 0xFF)
-        body.forEach { sum += (it.toInt() and 0xFF) }
-        out.add((((sum.inv()) + 1) and 0xFF).toByte()) // two's complement low byte
-        out.add(0x03)
-        return out.toByteArray()
-    }
-
-    override suspend fun downloadLabelTemplate(template: LabelTemplate): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            // 标签格式编号收敛到 DIGI 格式表范围（1..24，对应 T1..F8）
-            val formatNo = template.id.toInt().coerceIn(DigiLabelEncoder.FORMAT_NO_MIN, DigiLabelEncoder.FORMAT_NO_MAX)
-            val record = DigiLabelEncoder.encode(template, formatNo)
-            transport.request(frame(OpCode.DOWNLOAD_LABEL, record))
-                ?: error("No ACK from scale for label format $formatNo")
-            Unit
-        }
-    }
+    override suspend fun downloadLabelTemplate(template: LabelTemplate): Result<Unit> =
+        // 标签格式需按《标签格式1.xls》文件定义经 TWS 文件通道下发，结构待联调校准。
+        Result.failure(UnsupportedOperationException("寺冈标签格式下发待联调校准（标签格式文件定义见 标签格式1.xls）"))
 }
