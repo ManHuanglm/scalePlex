@@ -30,6 +30,10 @@ import java.io.File
  *
  * 标签格式资料已定位（LabelNet 官方软件：PFF0.txt 标签格式文本 + 元素类型 1-78 定义表），
  * 列序待真机校准后接入；时间同步 TWS 命令行无对应文件号，暂未接入。
+ *
+ * 机型族：SM-80/SM-100/SM-110(STE47-) 为 8442 族（本驱动支持）；
+ * SM-110n(STE57+)/SM-120/SM-5100/b 系列为 b 族（需 LabelNet 工具链，见 [DigiModelFamily]），
+ * connect 时校验并给出明确提示，避免用错工具链下发失败难排查。
  */
 class DigiSmDriver(
     private val device: ScaleDevice,
@@ -42,6 +46,10 @@ class DigiSmDriver(
 
     override suspend fun connect(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
+            // b 族机型（SM-110n STE57+/SM-120/SM-5100）需 LabelNet 工具链，与本驱动 TWS 工具链互不兼容
+            if (DigiModelFamily.fromModel(device.model) == DigiModelFamily.FAMILY_B) {
+                error("机型 ${device.model} 属 b 族（STE57+），需 LabelNet 工具链，当前驱动暂未接入（8442 族 SM-80/SM-100/SM-110 STE47- 不受影响）")
+            }
             if (!DigiToolsBridge.isConfigured()) {
                 error("寺冈工具目录未配置（系统设置：TWS.exe/SMScale.dll 所在目录）")
             }
@@ -50,6 +58,11 @@ class DigiSmDriver(
 
     override suspend fun getStatus(): Result<ScaleStatus> = withContext(Dispatchers.IO) {
         runCatching {
+            if (DigiModelFamily.fromModel(device.model) == DigiModelFamily.FAMILY_B) {
+                // b 族仍做 TCP 探测以便界面显示在线，但标注机型族提示
+                val online = DigiToolsBridge.checkOnline(device.ip, device.port)
+                return@runCatching ScaleStatus(online = online, model = device.model.ifBlank { "DIGI SM(b族)" })
+            }
             val online = DigiToolsBridge.checkOnline(device.ip, device.port)
             ScaleStatus(online = online, model = device.model.ifBlank { "DIGI SM" })
         }
@@ -61,6 +74,9 @@ class DigiSmDriver(
 
     override suspend fun downloadPluBatch(list: List<PluItem>): Result<BatchResult> = withContext(Dispatchers.IO) {
         runCatching {
+            if (DigiModelFamily.fromModel(device.model) == DigiModelFamily.FAMILY_B) {
+                error("机型 ${device.model} 属 b 族（STE57+），需 LabelNet 工具链，当前驱动暂未接入")
+            }
             if (list.isEmpty()) return@runCatching BatchResult.ok(0)
             val csvFile = File(
                 System.getProperty("java.io.tmpdir"),
