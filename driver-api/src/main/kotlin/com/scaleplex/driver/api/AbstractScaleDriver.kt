@@ -39,6 +39,12 @@ abstract class AbstractScaleDriver : IScaleDriver {
     override suspend fun deleteAllPlu(): Result<Unit> =
         Result.failure(UnsupportedOperationException("deleteAllPlu not implemented for $brand"))
 
+    override suspend fun uploadPlu(): Result<List<PluItem>> =
+        Result.failure(UnsupportedOperationException("uploadPlu not implemented for $brand"))
+
+    override suspend fun readLabelFormats(): Result<List<LabelTemplate>> =
+        Result.failure(UnsupportedOperationException("readLabelFormats not implemented for $brand"))
+
     override suspend fun syncTime(): Result<Unit> =
         Result.failure(UnsupportedOperationException("syncTime not implemented for $brand"))
 

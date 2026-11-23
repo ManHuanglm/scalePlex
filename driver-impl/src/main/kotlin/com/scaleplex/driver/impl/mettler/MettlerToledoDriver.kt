@@ -134,6 +134,41 @@ class MettlerToledoDriver(
         }
     }
 
+    override suspend fun uploadPlu(): Result<List<PluItem>> = withContext(Dispatchers.IO) {
+        runCatching {
+            // 回收：Item ReadAll 命令（MTScaleKey 文档支持 Read/ReadAll 控制字），
+            // 结果以数据文件形式落盘（CommandResult 引用），扫描含 <Item> 的 XML 解析。
+            val taskId = MtScaleKeyXml.newTaskId()
+            val taskDir = newTaskDir(taskId)
+            val input = mapOf(
+                "DeviceList.xml" to MtScaleKeyXml.buildDeviceListXml(listOf(device), mapOf(device.id to "Commands.xml")),
+                "Commands.xml" to MtScaleKeyXml.buildCommandsXml(
+                    listOf(MtCommand(MtScaleKeyXml.CMD_ITEM, control = "ReadAll")),
+                ),
+                "Task.xml" to MtScaleKeyXml.buildTaskXml(taskId, MtScaleKeyXml.TASK_TYPE_DOWNLOAD, "DeviceList.xml"),
+            )
+            input.forEach { (name, content) -> File(taskDir, name).writeText(content, Charsets.UTF_8) }
+            val resultFile = MtScaleKeyBridge.executeTask(taskDir, taskId).getOrElse { throw IllegalStateException(it.message) }
+            val result = MtScaleKeyBridge.parseResult(resultFile, listOf(device), 1)[device.id]
+            if (result == null || !result.allOk) {
+                error("回收 PLU 失败: ${result?.errors?.firstOrNull()?.message ?: "无结果"}")
+            }
+            val inputNames = input.keys
+            val dataXml = taskDir.listFiles { f ->
+                f.name !in inputNames && f.name.endsWith(".xml") && f.readText(Charsets.UTF_8).contains("<Item>")
+            }?.firstOrNull()?.readText(Charsets.UTF_8)
+                ?: error("任务结果中未找到商品数据文件")
+            MtScaleKeyXml.parseItemDataXml(dataXml)
+        }
+    }
+
+    override suspend fun readLabelFormats(): Result<List<LabelTemplate>> =
+        Result.failure(
+            UnsupportedOperationException(
+                "托利多标签格式回收需各型号专用编辑器（VisEdit/bLabel/Smartlabel）配合，暂未接入",
+            ),
+        )
+
     override suspend fun downloadLabelTemplate(template: LabelTemplate): Result<Unit> =
         Result.failure(
             UnsupportedOperationException(

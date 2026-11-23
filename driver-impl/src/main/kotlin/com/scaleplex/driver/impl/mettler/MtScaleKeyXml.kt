@@ -3,6 +3,7 @@ package com.scaleplex.driver.impl.mettler
 import com.scaleplex.core.model.PluItem
 import com.scaleplex.core.model.ScaleDevice
 import com.scaleplex.core.util.Numbers
+import java.math.BigDecimal
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -203,6 +204,45 @@ object MtScaleKeyXml {
             )
         }
         return out
+    }
+
+    /**
+     * 解析商品数据 Data XML（Item Read/ReadAll 回收结果）→ PLU 列表。
+     * 映射与 [buildItemDataXml] 互逆：PLU、AlternativeItemID、ItemName(zho/eng)、
+     * ItemPrice(文本价格 ×100 → minor、KGM/PCS)、Date BestBefore、LabelFormatID。
+     */
+    fun parseItemDataXml(xml: String): List<PluItem> {
+        val items = mutableListOf<PluItem>()
+        Regex("<Item>(.*?)</Item>", RegexOption.DOT_MATCHES_ALL).findAll(xml).forEach { m ->
+            val block = m.groupValues[1]
+            val pluNo = Regex("<PLU>(\\d+)</PLU>").find(block)?.groupValues?.get(1)?.toIntOrNull() ?: return@forEach
+            val barcode = Regex("<AlternativeItemID>(.*?)</AlternativeItemID>", RegexOption.DOT_MATCHES_ALL)
+                .findAll(block).mapNotNull { it.groupValues[1].trim().toIntOrNull() }
+                .firstOrNull()
+            fun description(type: String, language: String): String =
+                Regex("<Description[^>]*Type=\"$type\"[^>]*Language=\"$language\"[^>]*>(.*?)</Description>", RegexOption.DOT_MATCHES_ALL)
+                    .findAll(block).mapNotNull { it.groupValues[1].trim().takeIf { s -> s.isNotEmpty() } }
+                    .firstOrNull().orEmpty()
+            val name = description("ItemName", "zho")
+            val nameEn = description("ItemName", "eng")
+            val priceMatch = Regex("<ItemPrice[^>]*UnitOfMeasureCode=\"(\\w+)\"[^>]*>([\\d.]+)</ItemPrice>").find(block)
+            val uom = priceMatch?.groupValues?.get(1) ?: "KGM"
+            val priceText = priceMatch?.groupValues?.get(2) ?: "0"
+            val minor = BigDecimal(priceText).movePointRight(2).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact()
+            val labelFormat = Regex("<LabelFormatID[^>]*>(\\d+)</LabelFormatID>").find(block)?.groupValues?.get(1)?.toIntOrNull() ?: 1
+            val bestBefore = Regex("<Date[^>]*Type=\"BestBefore\"[^>]*>(\\d+)</Date>").find(block)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            items += PluItem(
+                pluNo = pluNo,
+                name = name,
+                nameEn = nameEn,
+                weightFlag = if (uom == UOM_PCS) 1 else 0,
+                unitPrice = minor,
+                eanCode = barcode?.toString() ?: "",
+                usedByDate = bestBefore,
+                label1Format = labelFormat,
+            )
+        }
+        return items
     }
 
     private fun String.intValue(tag: String): Int? =

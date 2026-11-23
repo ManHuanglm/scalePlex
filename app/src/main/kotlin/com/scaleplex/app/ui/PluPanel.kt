@@ -47,6 +47,7 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
     var editing by remember { mutableStateOf<PluItem?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var batchResults by remember { mutableStateOf<Map<Long, com.scaleplex.core.model.BatchResult>?>(null) }
+    var recallMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     val table = rememberTableState(
@@ -83,6 +84,21 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
             Spacer(Modifier.width(6.dp))
             Button(onClick = {
                 scope.launch {
+                    // 回收（参考 TOP2000"回收商品"）：逐台回收 PLU 并回写本地库
+                    var total = 0
+                    state.scaleService.devices().filter { it.enabled }.forEach { dev ->
+                        state.scaleService.driverFor(dev).uploadPlu().getOrNull()?.let { items ->
+                            state.pluService.saveAll(items)
+                            total += items.size
+                        }
+                    }
+                    recallMessage = tr("plu.recallDone") + total
+                    refresh.value++
+                }
+            }) { Text(tr("plu.upload")) }
+            Spacer(Modifier.width(6.dp))
+            Button(onClick = {
+                scope.launch {
                     // 勾选为空时下发当前筛选结果（参考银豹：勾选商品 → 下发传秤）
                     val targets = plus.filter { checked.contains(it.pluNo) }.ifEmpty { plus }
                     batchResults = state.scaleService.downloadToDevices(
@@ -93,6 +109,9 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
         }
         // ---- 次工具栏：自动生成热键 / 导入 / 导出 ----
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (recallMessage.isNotBlank()) {
+                Text(recallMessage, fontSize = 12.sp, color = Color(0xFF2E7D32))
+            }
             Text(
                 tr("plu.checkedCount") + " ${checked.size}",
                 fontSize = 12.sp, color = Color(0xFF808080),

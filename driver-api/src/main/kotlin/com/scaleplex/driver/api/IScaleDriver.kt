@@ -35,6 +35,12 @@ interface IScaleDriver {
     suspend fun deletePlu(pluNo: Int): Result<Unit>
     suspend fun deleteAllPlu(): Result<Unit>
 
+    /** Read PLUs stored on the scale (reverse sync scale -> software). */
+    suspend fun uploadPlu(): Result<List<PluItem>>
+
+    /** Read label formats defined on the scale (reverse sync scale -> software). */
+    suspend fun readLabelFormats(): Result<List<LabelTemplate>>
+
     /** Synchronize the scale's real-time clock to the host time. */
     suspend fun syncTime(): Result<Unit>
 

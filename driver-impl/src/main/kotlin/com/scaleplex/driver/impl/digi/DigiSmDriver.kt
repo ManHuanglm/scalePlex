@@ -92,6 +92,26 @@ class DigiSmDriver(
         }
     }
 
+    override suspend fun uploadPlu(): Result<List<PluItem>> = withContext(Dispatchers.IO) {
+        runCatching {
+            // 回收：TWS RDF 25 → IP.25.DAT（每行一条 25H 记录）→ 按 PLU_FILE.TXT 布局解析
+            val (codes, datFile) = DigiToolsBridge.runTws(
+                "RDF", DigiToolsBridge.PLU_FILE_NO.toString(), device.ip, device.port.toString(),
+                timeoutMs = 120_000,
+            )
+            if (codes.isEmpty()) error("回收 PLU 失败：无结果")
+            if (codes.none { it == 0 || it == -3 }) {
+                error("回收 PLU 失败: ${codes.joinToString(",") { DigiToolsBridge.describeResult(it) }}")
+            }
+            if (datFile == null || codes.any { it == -3 }) emptyList()
+            else DigiPluFileParser.parseFile(datFile)
+        }
+    }
+
+    override suspend fun readLabelFormats(): Result<List<LabelTemplate>> =
+        // 寺冈标签格式文件号与结构定义见《标签格式1.xls》，待实体秤联调校准后接入。
+        Result.failure(UnsupportedOperationException("寺冈标签格式回收待联调校准（标签格式文件定义见 标签格式1.xls）"))
+
     override suspend fun syncTime(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             // SMScaleAPI.dll 提供 SyncDateTime(socket)，但为进程内有状态调用；
