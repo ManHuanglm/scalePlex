@@ -21,10 +21,11 @@ import com.scaleplex.core.util.Numbers
  * 新增 / 编辑 PLU 弹窗，字段布局对齐 TOP2000「添加新品」表单：
  * 部门号、PLU编号、项目代码、单价(/Kg)、F1F2、保质期、商品名称、商品类型、成分、特殊信息，
  * 另保留品名英 / 成本 / 皮重 / 标签格式为「高级选项」折叠区。
- * 保存前在弹窗内执行校验，失败就地提示，不关闭弹窗。
+ * 保存前先本地校验、再交由 [onSave] 落库；[onSave] 返回错误信息（null = 成功），
+ * 失败时错误就地提示，弹窗不关闭。
  */
 @Composable
-fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, onSave: (PluItem) -> Unit) {
+fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, onSave: (PluItem) -> String?) {
     var plu by remember { mutableStateOf(initial) }
     var ingredientText by remember { mutableStateOf(linesToText(initial.ingredientLines)) }
     var specialMsgText by remember { mutableStateOf(linesToText(initial.specialMsgLines)) }
@@ -147,7 +148,10 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                     specialMsgLines = textToLines(specialMsgText),
                 )
                 when (val v = state.pluService.validate(candidate)) {
-                    is com.scaleplex.core.util.ValidationResult.Ok -> onSave(candidate)
+                    is com.scaleplex.core.util.ValidationResult.Ok -> {
+                        val saveError = onSave(candidate)
+                        if (saveError != null) errors = listOf(saveError)
+                    }
                     is com.scaleplex.core.util.ValidationResult.Invalid -> errors = v.errors
                 }
             }) { Text(tr("plu.save")) }

@@ -27,12 +27,19 @@ object PluValidator {
 
         if (plu.eanCode.isNotBlank()) {
             when {
-                plu.barcodeType == 0 && !isValidEan(plu.eanCode) ->
+                // 仅对 8/13 位纯数字（EAN 形态）校验校验位；TOP2000 风格的短项目代码直接放行
+                plu.barcodeType == 0 && isEanCandidate(plu.eanCode) && !isValidEan(plu.eanCode) ->
                     errors += "EAN 校验位错误 / Invalid EAN check digit"
             }
         }
 
         return if (errors.isEmpty()) ValidationResult.Ok else ValidationResult.Invalid(errors)
+    }
+
+    /** 是否为需要校验位校验的 EAN 形态编码：8 或 13 位纯数字。 */
+    fun isEanCandidate(code: String): Boolean {
+        val digits = code.filter { it.isDigit() }
+        return digits == code && digits.length in intArrayOf(8, 13)
     }
 
     /** Validate an EAN-8 / EAN-13 check digit. */
