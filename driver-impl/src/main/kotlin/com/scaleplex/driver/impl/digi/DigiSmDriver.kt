@@ -22,10 +22,14 @@ import java.io.File
  * - 交易流水：`TWS.exe RDFL 81 <ip> <port>`（0x51 销售明细）→ 按
  *   `SM100_RTRECEIPT_DETAIL.dsc` 字段表解析（[DigiReceiptParser]）；
  * - 在线探测：`TWS.exe RDR 25 <ip> <port>` 读 PLU 首条记录；
+ * - 单条 PLU 删除：`RDF 25` 定位记录号 → `TWS.exe DELR 25 <记录号>`；
  * - 清空 PLU：`TWS.exe DELF 25 <ip> <port>`（文件级删除）。
  *
  * 前置条件：设置页配置寺冈工具目录（含 TWS.exe/SMScale.dll/SM.ini/Desc），系统属性
  * `scaleplex.digi.tools`。早期猜测的 UDP 二进制帧协议已废弃（未经实体秤验证）。
+ *
+ * 标签格式资料已定位（LabelNet 官方软件：PFF0.txt 标签格式文本 + 元素类型 1-78 定义表），
+ * 列序待真机校准后接入；时间同步 TWS 命令行无对应文件号，暂未接入。
  */
 class DigiSmDriver(
     private val device: ScaleDevice,
@@ -81,10 +85,25 @@ class DigiSmDriver(
         }
     }
 
-    override suspend fun deletePlu(pluNo: Int): Result<Unit> =
-        // TWS 记录级删除（DELR）按记录位置定位，需要先读取 PLU 文件（回收操作，超出
-        // "资料只能下发不能回收" 约束），单条删除暂不提供；清空请用 deleteAllPlu。
-        Result.failure(UnsupportedOperationException("寺冈单条 PLU 删除暂不支持，请使用清空 PLU"))
+    override suspend fun deletePlu(pluNo: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            // 单条删除：RDF 25 全量回收 → 按 PLU 号定位记录号 → TWS DELR 25 <记录号>
+            val (codes, datFile) = DigiToolsBridge.runTws(
+                "RDF", DigiToolsBridge.PLU_FILE_NO.toString(), device.ip, device.port.toString(),
+                timeoutMs = 120_000,
+            )
+            if (codes.isEmpty() || codes.none { it == 0 || it == -3 }) {
+                error("定位 PLU $pluNo 失败: ${codes.joinToString(",") { DigiToolsBridge.describeResult(it) }}")
+            }
+            if (codes.any { it == -3 } || datFile == null) {
+                error("秤上无 PLU 记录，无法删除 PLU $pluNo")
+            }
+            val recordNo = DigiPluFileParser.parseFileIndexed(datFile)
+                .firstOrNull { it.second.pluNo == pluNo }?.first
+                ?: error("秤上未找到 PLU $pluNo")
+            DigiToolsBridge.deleteRecord(DigiToolsBridge.PLU_FILE_NO, recordNo, device.ip, device.port)
+        }
+    }
 
     override suspend fun deleteAllPlu(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
@@ -109,8 +128,9 @@ class DigiSmDriver(
     }
 
     override suspend fun readLabelFormats(): Result<List<LabelTemplate>> =
-        // 寺冈标签格式文件号与结构定义见《标签格式1.xls》，待实体秤联调校准后接入。
-        Result.failure(UnsupportedOperationException("寺冈标签格式回收待联调校准（标签格式文件定义见 标签格式1.xls）"))
+        // 标签格式资料已定位：LabelNet 官方软件 PFF0.txt（文本格式）+ 元素类型 1-78 定义表
+        // （ParameterPLU2.ini [LabelFormat_Item]）。TWS 文件号与列序待实体秤抓包校准后接入。
+        Result.failure(UnsupportedOperationException("寺冈标签格式回收待真机校准（LabelNet PFF0.txt 格式已定位，TWS 文件号待确认）"))
 
     override suspend fun syncTime(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {

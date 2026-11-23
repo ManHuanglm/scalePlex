@@ -1,4 +1,4 @@
-﻿package com.scaleplex.driver.impl.digi
+package com.scaleplex.driver.impl.digi
 
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -106,6 +106,17 @@ object DigiToolsBridge {
         val (codes, _) = runTws("DELF", fileNo.toString(), ip, port.toString())
         if (codes.isNotEmpty() && codes.none { it == 0 }) {
             error("删除文件 $fileNo 失败: ${codes.joinToString(",") { describeResult(it) }}")
+        }
+    }
+
+    /** 删除秤上指定文件的单条记录（`TWS DELR <文件号> <记录号> <IP> <端口>`）。 */
+    fun deleteRecord(fileNo: Int, recordNo: Int, ip: String, port: Int) {
+        val (codes, _) = runTws(
+            "DELR", fileNo.toString(), recordNo.toString(), ip, port.toString(),
+            timeoutMs = 30_000,
+        )
+        if (codes.isNotEmpty() && codes.none { it == 0 }) {
+            error("删除记录 $recordNo 失败: ${codes.joinToString(",") { describeResult(it) }}")
         }
     }
 

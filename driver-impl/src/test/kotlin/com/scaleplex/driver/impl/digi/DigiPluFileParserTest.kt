@@ -57,4 +57,21 @@ class DigiPluFileParserTest {
         assertEquals(0, DigiPluFileParser.parseLines(listOf("", "NOTHEXLINE", "ABCDEF")).size)
         assertTrue(DigiPluFileParser.parseLines(listOf(docSample)).isNotEmpty())
     }
+
+    @Test
+    fun `indexed parse keeps tws record numbers`() {
+        // 3 条记录（PLU 1661 / 1 / 1661），记录号 = 非空记录行的 1-based 行号
+        val lines = listOf("", docSample, realSample, docSample)
+        val tmp = java.io.File.createTempFile("digiplu", ".dat")
+        tmp.writeText(lines.joinToString("\r\n"), Charsets.ISO_8859_1)
+        try {
+            val list = DigiPluFileParser.parseFileIndexed(tmp)
+            assertEquals(3, list.size)
+            assertEquals(1 to 1661, list[0].first to list[0].second.pluNo)
+            assertEquals(2 to 1, list[1].first to list[1].second.pluNo)
+            assertEquals(3, list[2].first)
+        } finally {
+            tmp.delete()
+        }
+    }
 }

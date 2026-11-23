@@ -41,6 +41,18 @@ object DigiPluFileParser {
     fun parseLines(lines: List<String>): List<PluItem> =
         lines.map { it.trim() }.filter { it.length >= 20 }.mapNotNull { parseLine(it) }
 
+    /**
+     * 解析并返回 (TWS 记录号, PLU)。记录号 = 非空记录行的 1-based 行号
+     * （TWS `DELR <文件号> <记录号>` 按此号删除单条记录）。
+     */
+    fun parseFileIndexed(file: File): List<Pair<Int, PluItem>> =
+        file.readLines(Charsets.ISO_8859_1)
+            .map { it.trim() }
+            .filter { it.length >= 20 }
+            .mapIndexedNotNull { index, line ->
+                parseLine(line)?.let { (index + 1) to it }
+            }
+
     /** 解析单条 25H 记录（16 进制文本行）。 */
     fun parseLine(line: String): PluItem? {
         val bytes = DigiReceiptParser.hexToBytes(line) ?: return null
