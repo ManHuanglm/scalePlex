@@ -51,28 +51,10 @@ internal object JsonCodec {
     }
 
     // ---- List<LabelElement> ----
+    // Element JSON 序列化收敛到 core 的 LabelTemplateJson（与导入导出文件格式同源）
     fun writeElements(elements: List<LabelElement>): String =
-        "[" + elements.joinToString(",") { e ->
-            "{\"kind\":\"${e.kind.name}\",\"x\":${e.xMm},\"y\":${e.yMm},\"w\":${e.widthMm},\"h\":${e.heightMm}," +
-                "\"text\":\"${esc(e.text)}\",\"font\":\"${esc(e.fontName)}\",\"size\":${e.fontSizePt}," +
-                "\"align\":${e.align},\"rot\":${e.rotation}}"
-        } + "]"
+        com.scaleplex.core.model.LabelTemplateJson.writeElements(elements)
 
-    fun readElements(json: String): List<LabelElement> {
-        if (json.isBlank() || json == "[]") return emptyList()
-        return Regex("\\{[^}]*\\}").findAll(json).map { obj ->
-            val kind = Regex("\"kind\"\\s*:\\s*\"(\\w+)\"").find(obj.value)?.groupValues?.get(1)
-                ?.let { runCatching { LabelElementKind.valueOf(it) }.getOrNull() } ?: LabelElementKind.TEXT
-            fun num(key: String) = Regex("\"$key\"\\s*:\\s*(-?[\\d.]+)").find(obj.value)?.groupValues?.get(1)?.toFloatOrNull() ?: 0f
-            val text = Regex("\"text\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").find(obj.value)
-                ?.groupValues?.get(1)?.let(::unesc) ?: ""
-            val font = Regex("\"font\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").find(obj.value)
-                ?.groupValues?.get(1)?.let(::unesc) ?: "SimSun"
-            LabelElement(
-                kind = kind, xMm = num("x"), yMm = num("y"), widthMm = num("w"), heightMm = num("h"),
-                text = text, fontName = font, fontSizePt = num("size").toInt(),
-                align = num("align").toInt(), rotation = num("rot").toInt(),
-            )
-        }.toList()
-    }
+    fun readElements(json: String): List<LabelElement> =
+        com.scaleplex.core.model.LabelTemplateJson.readElements(json)
 }

@@ -10,13 +10,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scaleplex.app.AppState
+import com.scaleplex.app.ui.label.LabelEditorDialog
 import com.scaleplex.core.i18n.tr
 import com.scaleplex.core.model.LabelTemplate
 
-/** Label template list panel. Full visual editor is a phase-1 stretch; this manages templates. */
+/** Label template list panel: list + open visual editor + delete. */
 @Composable
 fun LabelPanel(state: AppState, refresh: MutableState<Int>) {
     var templates by remember(refresh.value) { mutableStateOf(state.labelService.list()) }
+    var editing by remember { mutableStateOf<LabelTemplate?>(null) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -35,10 +37,20 @@ fun LabelPanel(state: AppState, refresh: MutableState<Int>) {
                         Text(t.name, fontSize = 14.sp)
                         Text("${t.widthMm}×${t.heightMm} mm · ${t.elements.size} elements", fontSize = 11.sp)
                     }
+                    TextButton(onClick = { editing = t }) { Text(tr("label.edit")) }
                     TextButton(onClick = { state.labelService.delete(t.id); refresh.value++ }) { Text(tr("device.delete")) }
                 }
                 Divider()
             }
         }
+    }
+
+    editing?.let { current ->
+        LabelEditorDialog(
+            state = state,
+            initial = current,
+            onDismiss = { editing = null },
+            onSaved = { refresh.value++ },
+        )
     }
 }
