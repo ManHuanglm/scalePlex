@@ -30,6 +30,8 @@ class ConfigService(db: Database) {
             logLevel = g("logLevel", "INFO"),
             autoBackup = g("autoBackup", "true").toBoolean(),
             backupPath = g("backupPath", ""),
+            autoDownload = g("autoDownload", "false").toBoolean(),
+            barcodeFormat = (g("barcodeFormat", "0")).toIntOrNull() ?: 0,
         )
     }
 
@@ -46,6 +48,8 @@ class ConfigService(db: Database) {
         dao.put("logLevel", cfg.logLevel)
         dao.put("autoBackup", cfg.autoBackup.toString())
         dao.put("backupPath", cfg.backupPath)
+        dao.put("autoDownload", cfg.autoDownload.toString())
+        dao.put("barcodeFormat", cfg.barcodeFormat.toString())
         applyLocale(cfg.language)
     }
 

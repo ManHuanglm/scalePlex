@@ -113,6 +113,9 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                             s.toIntOrNull()?.let { plu = plu.copy(tare = it.coerceAtLeast(0)) }
                         }
                     }
+                    Field(tr("plu.hotkey"), if (plu.hotKey > 0) plu.hotKey.toString() else "", Modifier.fillMaxWidth()) { s ->
+                        s.toIntOrNull()?.let { plu = plu.copy(hotKey = it.coerceIn(0, 999)) }
+                    }
                     var labelExpanded by remember { mutableStateOf(false) }
                     OutlinedTextField(
                         value = (DigiTables.LABEL1_FORMATS.firstOrNull { it.first == plu.label1Format }?.second)

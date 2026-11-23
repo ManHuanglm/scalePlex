@@ -82,6 +82,21 @@ class AppState(
         commBus.rawCaptureEnabled.set(cfg.rawPacketLog)
     }
 
+    /**
+     * 启动自动下发（参考银豹"自动下发"）：配置开启时，稍等心跳首轮探测后
+     * 向全部启用秤下发一次全量 PLU，结果仅记录日志，不打扰用户。
+     */
+    fun startAutoDownloadIfNeeded() {
+        if (!config.autoDownload) return
+        scope.launch {
+            delay(5000)
+            scaleService.downloadToDevices(
+                scaleService.devices().filter { it.enabled },
+                pluService.all(),
+            )
+        }
+    }
+
     fun currentDevice(id: Long): ScaleDevice? = scaleService.getDevice(id)
 
     fun shutdown() {

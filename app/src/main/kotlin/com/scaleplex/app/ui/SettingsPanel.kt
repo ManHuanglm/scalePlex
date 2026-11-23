@@ -12,6 +12,12 @@ import com.scaleplex.core.i18n.tr
 import java.io.File
 import javax.swing.JFileChooser
 
+/** 条码格式编号 → 描述（DIGI EAN 条码格式表）。 */
+private fun formatName(no: Int): String {
+    val entry = com.scaleplex.core.model.DigiTables.EAN_BARCODE_FORMATS.firstOrNull { it.first == no }
+    return if (no == 0) tr("settings.formatDefault") else "$no · ${entry?.second ?: no}"
+}
+
 /** 系统设置面板：语言、通信参数、报文调试、主题、数据库备份/恢复。 */
 @Composable
 fun SettingsPanel(state: AppState, refresh: MutableState<Int>) {
@@ -52,6 +58,37 @@ fun SettingsPanel(state: AppState, refresh: MutableState<Int>) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(tr("settings.rawlog"), Modifier.width(160.dp))
             Switch(cfg.rawPacketLog, { cfg = cfg.copy(rawPacketLog = it); state.applyConfig(cfg) })
+        }
+
+        // 自动下发（参考银豹"自动下发"：启动后自动向全部秤下发一次全量 PLU）
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(tr("settings.autoDownload"), Modifier.width(160.dp))
+            Switch(cfg.autoDownload, { cfg = cfg.copy(autoDownload = it); state.applyConfig(cfg) })
+        }
+
+        // 条码格式批量应用（参考银豹"条码秤格式"选择）
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(tr("settings.barcodeFormat"), Modifier.width(160.dp))
+            var formatExpanded by remember { mutableStateOf(false) }
+            var applyMessage by remember { mutableStateOf("") }
+            OutlinedButton(onClick = { formatExpanded = true }) { Text(formatName(cfg.barcodeFormat)) }
+            DropdownMenu(formatExpanded, { formatExpanded = false }) {
+                com.scaleplex.core.model.DigiTables.EAN_BARCODE_FORMATS.forEach { (no, name) ->
+                    DropdownMenuItem(onClick = {
+                        cfg = cfg.copy(barcodeFormat = no)
+                        state.applyConfig(cfg)
+                        val n = state.pluService.bulkEdit(state.pluService.all().map { it.pluNo }) {
+                            it.copy(barcodeFormat = no)
+                        }
+                        applyMessage = tr("settings.applyDone") + n
+                        formatExpanded = false
+                        refresh.value++
+                    }) { Text("$no · $name") }
+                }
+            }
+            if (applyMessage.isNotBlank()) {
+                Text(applyMessage, fontSize = 12.sp, color = androidx.compose.ui.graphics.Color(0xFF2E7D32))
+            }
         }
 
         // Theme

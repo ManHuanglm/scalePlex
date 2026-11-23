@@ -32,7 +32,12 @@ fun main() {
     configService.applyLocale(config.language)
 
     application {
-        val state = remember { AppState(db, configService, config).apply { startHeartbeatPolling() } }
+        val state = remember {
+            AppState(db, configService, config).apply {
+                startHeartbeatPolling()
+                startAutoDownloadIfNeeded()
+            }
+        }
         Window(
             onCloseRequest = {
                 state.shutdown()

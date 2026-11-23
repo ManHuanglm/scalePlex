@@ -57,4 +57,8 @@ data class ScaleConfig(
     val logLevel: String = "INFO",
     val autoBackup: Boolean = true,
     val backupPath: String = "",
+    /** 登录/启动后自动向全部在线秤下发一次全量 PLU（参考银豹"自动下发"）。 */
+    val autoDownload: Boolean = false,
+    /** 下发条码格式编号（DIGI EAN 条码格式表，见 DigiTables.EAN_BARCODE_FORMATS）。 */
+    val barcodeFormat: Int = 0,
 )
