@@ -71,6 +71,24 @@ class ScaleService(db: Database) {
         )
     }
 
+    /**
+     * Protocol-level reachability probe: ONLINE only when the scale actually answers
+     * a status request. UDP transports "connect" trivially (connectionless), so the
+     * online state must be decided by an application-level ping, not transport connect.
+     */
+    suspend fun probeStatus(device: ScaleDevice): DeviceRuntime {
+        val drv = driverFor(device)
+        val status = runCatching { drv.getStatus().getOrNull() }.getOrNull()
+        val online = status?.online == true
+        return DeviceRuntime(
+            device = device,
+            status = if (online) DeviceStatus.ONLINE else DeviceStatus.OFFLINE,
+            model = status?.model ?: device.model,
+            firmware = status?.firmware ?: "",
+            lastSeen = if (online) System.currentTimeMillis() else 0L,
+        )
+    }
+
     suspend fun disconnect(device: ScaleDevice) {
         drivers.remove(device.id)?.let { runCatching { it.disconnect() } }
     }
@@ -89,10 +107,11 @@ class ScaleService(db: Database) {
             async(Dispatchers.IO) {
                 sem.withPermit {
                     val drv = driverFor(device)
-                    val connected = drv.connect().isSuccess
-                    if (!connected) {
+                    // 协议级连通探测（UDP connect 无握手，connect() 成功不代表可达）
+                    val reachable = runCatching { drv.getStatus().getOrNull()?.online == true }.getOrDefault(false)
+                    if (!reachable) {
                         device.id to BatchResult(total = plus.size, failed = plus.size,
-                            errors = listOf(com.scaleplex.core.model.BatchError(device.id, null, "connect failed")))
+                            errors = listOf(com.scaleplex.core.model.BatchError(device.id, null, "scale offline / unreachable")))
                     } else {
                         val r = drv.downloadPluBatch(plus)
                         device.id to r.getOrElse {
@@ -123,10 +142,10 @@ class ScaleService(db: Database) {
             async(Dispatchers.IO) {
                 sem.withPermit {
                     val drv = driverFor(device)
-                    val connected = drv.connect().isSuccess
-                    if (!connected) {
+                    val reachable = runCatching { drv.getStatus().getOrNull()?.online == true }.getOrDefault(false)
+                    if (!reachable) {
                         device.id to BatchResult(total = 1, failed = 1,
-                            errors = listOf(com.scaleplex.core.model.BatchError(device.id, null, "connect failed")))
+                            errors = listOf(com.scaleplex.core.model.BatchError(device.id, null, "scale offline / unreachable")))
                     } else {
                         val r = drv.downloadLabelTemplate(template).fold(
                             onSuccess = { BatchResult.ok(total = 1) },

@@ -38,19 +38,9 @@ import kotlinx.coroutines.launch
 fun DeviceTree(state: AppState, modifier: Modifier = Modifier, refresh: MutableState<Int>) {
     var groups by remember(refresh.value) { mutableStateOf(state.scaleService.groups()) }
     var selectedDeviceId by remember { mutableStateOf<Long?>(null) }
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
 
-    LaunchedEffect(refresh.value) {
-        groups = state.scaleService.groups()
-        // Kick off a status refresh for every device.
-        state.scaleService.devices().forEach { dev ->
-            scope.launch {
-                val rt = state.scaleService.connect(dev)
-                state.deviceRuntimes[dev.id] = rt
-                refresh.value++
-            }
-        }
-    }
+    // 设备在线状态由心跳轮询持续刷新（协议级探测），不再用 UDP connect 误判
+    LaunchedEffect(Unit) { state.startHeartbeatPolling() }
 
     Column(modifier = modifier.background(Color(0xFF26282C))) {
         Row(
