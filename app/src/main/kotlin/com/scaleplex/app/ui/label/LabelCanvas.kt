@@ -149,7 +149,7 @@ private fun handleNudge(
 @Composable
 private fun TopRuler(widthMm: Int, pxPerMm: Float) {
     val measurer = rememberTextMeasurer()
-    Canvas(modifier = Modifier.width((widthMm * pxPerMm).dp).height(18.dp)) {
+    Canvas(modifier = Modifier.width((widthMm * pxPerMm).dp.coerceAtLeast(1.dp)).height(18.dp)) {
         var mm = 0
         while (mm <= widthMm) {
             val x = mm * pxPerMm
@@ -160,7 +160,8 @@ private fun TopRuler(widthMm: Int, pxPerMm: Float) {
                 Offset(x, size.height),
                 1f,
             )
-            if (major && mm > 0) {
+            // 文本需在画布内完整绘制（drawText 对负剩余宽度直接抛约束异常）
+            if (major && mm > 0 && x + 14f < size.width) {
                 drawText(
                     measurer, mm.toString(),
                     topLeft = Offset(x + 2f, 1f),
@@ -176,7 +177,7 @@ private fun TopRuler(widthMm: Int, pxPerMm: Float) {
 @Composable
 private fun LeftRuler(heightMm: Int, pxPerMm: Float) {
     val measurer = rememberTextMeasurer()
-    Canvas(modifier = Modifier.width(18.dp).height((heightMm * pxPerMm).dp)) {
+    Canvas(modifier = Modifier.width(18.dp).height((heightMm * pxPerMm).dp.coerceAtLeast(1.dp))) {
         var mm = 0
         while (mm <= heightMm) {
             val y = mm * pxPerMm
@@ -187,7 +188,7 @@ private fun LeftRuler(heightMm: Int, pxPerMm: Float) {
                 Offset(size.width, y),
                 1f,
             )
-            if (major && mm > 0) {
+            if (major && mm > 0 && y + 12f < size.height) {
                 drawText(
                     measurer, mm.toString(),
                     topLeft = Offset(1f, y + 2f),
