@@ -128,9 +128,9 @@ object MtScaleKeyXml {
                     "${Numbers.minorToDisplay(plu.unitPrice, priceDecimals)}</ItemPrice>",
             )
             appendLine("    </ItemPrices>")
-            if (plu.usedByDate > 0) {
+            if (plu.effectiveShelfLifeDays > 0) {
                 appendLine("    <Dates>")
-                appendLine("""      <Date Type="BestBefore" PrintFlag="True" Unit="Days">${plu.usedByDate}</Date>""")
+                appendLine("""      <Date Type="BestBefore" PrintFlag="True" Unit="Days">${plu.effectiveShelfLifeDays}</Date>""")
                 appendLine("    </Dates>")
             }
             appendLine("    <LabelFormats>")

@@ -71,7 +71,7 @@ object DahuaPluTextCodec {
         append(code6(p.eanCode))
         append(price(p.unitPrice, priceWidth))
         append(p.weightFlag.coerceIn(0, 9))
-        append((p.usedByDate.coerceIn(0, 999)).toString().padStart(3, '0'))
+        append((p.effectiveShelfLifeDays.coerceIn(0, 999)).toString().padStart(3, '0'))
         append(p.placeNo.coerceIn(0, 99).toString().padStart(2, '0'))
         append(p.tare.coerceIn(0, 15000).toString().padStart(5, '0'))
         append(p.specialMsgLines.size.coerceIn(0, 9))
@@ -92,7 +92,7 @@ object DahuaPluTextCodec {
         append("00") // 特殊信息1（需秤内预存信息表，暂不支持）
         append("00") // 特殊信息2
         append("00") // 特殊信息3
-        append((p.usedByDate.coerceIn(0, 999)).toString().padStart(3, '0'))
+        append((p.effectiveShelfLifeDays.coerceIn(0, 999)).toString().padStart(3, '0'))
         append(p.placeNo.coerceIn(0, 99).toString().padStart(2, '0')) // 店名号
         append(p.mainGroup.coerceIn(0, 99).toString().padStart(2, '0')) // 部门号
         append(p.eanCode.filter { it.isDigit() }.takeLast(13).padStart(13, '0')) // 13 位数字代号

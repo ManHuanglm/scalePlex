@@ -115,7 +115,7 @@ object DigiPluCsvCodec {
             c[6] = p.flagData
             c[7] = p.barRightDataType.toString()
             c[8] = p.eanCode
-            c[9] = p.usedByDate.toString()
+            c[9] = p.effectiveShelfLifeDays.toString()
             // commodity line1
             val cl = p.commodityLines
             c[10] = if (cl.isNotEmpty()) "1" else ""

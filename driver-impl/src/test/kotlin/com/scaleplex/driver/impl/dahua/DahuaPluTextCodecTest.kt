@@ -181,4 +181,20 @@ class DahuaPluTextCodecTest {
         ).single()
         assertTrue(line.endsWith(name9 + "B"))
     }
+
+    @Test
+    fun shelfLifeUnitConvertedToDaysOnEncode() {
+        // 保质期单位换算：1 月 → 30 天（大华有效期固定为天）
+        val line = DahuaPluTextCodec.encodeLines(
+            listOf(
+                PluItem(
+                    pluNo = 1, eanCode = "100001", unitPrice = 100L, name = "测试",
+                    usedByDate = 1, shelfLifeUnit = com.scaleplex.core.model.ShelfLifeUnit.MONTH.id,
+                ),
+            ),
+            DahuaPluTextCodec.PluVersion.TMBZ_6,
+        ).single()
+        // 有效期段（[17:20]）= 030
+        assertEquals("030", line.substring(17, 20))
+    }
 }

@@ -10,6 +10,7 @@ import com.scaleplex.core.model.ScaleConfig
 import com.scaleplex.core.model.ScaleDevice
 import com.scaleplex.db.Database
 import com.scaleplex.service.ConfigService
+import com.scaleplex.service.CategoryService
 import com.scaleplex.service.LabelService
 import com.scaleplex.service.PluService
 import com.scaleplex.service.ScaleService
@@ -37,6 +38,7 @@ class AppState(
     val commBus = CommEventBus()
 
     val pluService = PluService(db)
+    val categoryService = CategoryService(db)
     val scaleService = ScaleService(db)
     val labelService = LabelService(db)
     val tradeLogService = TradeLogService(db)

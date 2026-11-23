@@ -20,63 +20,101 @@ import com.scaleplex.app.ui.table.cellPadding
 import com.scaleplex.app.ui.table.rememberTableState
 import com.scaleplex.core.i18n.tr
 import com.scaleplex.core.model.PluItem
+import com.scaleplex.core.model.ShelfLifeUnit
 import com.scaleplex.core.util.Numbers
+import com.scaleplex.db.dao.PluDao
 import com.scaleplex.service.io.ImportExportService
 import kotlinx.coroutines.launch
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.swing.JFileChooser
 
 /**
- * PLU 管理面板（下发流程参考银豹传秤）：
- * 勾选商品下发、按部门筛选、热键列 + 自动生成热键、Excel 导入导出；
- * 列对齐 TOP2000（部门号/PLU编号/项目代码/商品名称/单价/F1F2/保质期/商品类型/热键/成分/特殊信息），
- * 表格列宽可拖拽自由拉伸。
+ * PLU 管理面板（界面功能对齐顶尖 LiNK64 商品资料）：
+ * - 筛选字段下拉（全部/条码/货号/名称/类别编号）+ 搜索框；
+ * - 列顺序对齐顶尖：类别/货号/条码起始号/名称1/单价/条码类型/主标签编号/生产日期/保质期/保质期单位/名称2/信息1/修改时间/热键/类别编号；
+ * - 类别资料入口（[CategoryDialog]，对应顶尖「类别资料」），类别列显示类别名称；
+ * - 勾选商品下发、从秤回收、自动生成热键、Excel 导入导出；列宽可拖拽自由拉伸。
  */
 @Composable
 fun PluPanel(state: AppState, refresh: MutableState<Int>) {
     var keyword by remember { mutableStateOf("") }
-    var deptFilter by remember { mutableStateOf<Int?>(null) }
+    var filterField by remember { mutableStateOf(PluDao.FIELD_ALL) }
+    var categoryFilter by remember { mutableStateOf<Int?>(null) }
     val checked = remember { mutableStateListOf<Int>() }
 
-    var plus by remember(keyword, refresh.value, deptFilter) {
+    val categoryNames = remember(refresh.value) { state.categoryService.nameMap() }
+    val categories = remember(refresh.value) { state.categoryService.all() }
+
+    var plus by remember(keyword, refresh.value, categoryFilter, filterField) {
         mutableStateOf(
-            state.pluService.list(keyword, page = 0, pageSize = 500)
-                .filter { deptFilter == null || it.mainGroup == deptFilter }
+            state.pluService.list(keyword, page = 0, pageSize = 500, field = filterField)
+                .filter { categoryFilter == null || it.mainGroup == categoryFilter }
         )
     }
     var editing by remember { mutableStateOf<PluItem?>(null) }
     var showEditor by remember { mutableStateOf(false) }
+    var showCategory by remember { mutableStateOf(false) }
     var batchResults by remember { mutableStateOf<Map<Long, com.scaleplex.core.model.BatchResult>?>(null) }
     var recallMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     val table = rememberTableState(
-        listOf(36.dp, 60.dp, 70.dp, 110.dp, 170.dp, 80.dp, 50.dp, 60.dp, 60.dp, 50.dp, 110.dp, 110.dp),
+        listOf(
+            36.dp, 70.dp, 55.dp, 90.dp, 150.dp, 75.dp, 60.dp, 60.dp, 65.dp, 55.dp, 55.dp,
+            100.dp, 90.dp, 100.dp, 45.dp, 55.dp,
+        ),
     )
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // ---- 工具栏：搜索 / 部门筛选 / 新增 / 下发选中 ----
+        // ---- 工具栏：筛选字段 + 搜索 + 类别筛选 + 类别资料 + 新增 + 下发/回收 ----
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            // 筛选字段下拉（对齐顶尖「筛选字段」）
+            var fieldExpanded by remember { mutableStateOf(false) }
+            OutlinedTextField(
+                value = filterFieldLabel(filterField),
+                onValueChange = {}, readOnly = true, label = { Text(tr("plu.filterField")) },
+                modifier = Modifier.width(110.dp),
+                trailingIcon = { TextButton(onClick = { fieldExpanded = true }) { Text("▾") } },
+            )
+            DropdownMenu(fieldExpanded, { fieldExpanded = false }) {
+                listOf(
+                    PluDao.FIELD_ALL, PluDao.FIELD_BARCODE, PluDao.FIELD_PLU,
+                    PluDao.FIELD_NAME, PluDao.FIELD_CATEGORY,
+                ).forEach { f ->
+                    DropdownMenuItem(onClick = { filterField = f; fieldExpanded = false }) {
+                        Text(filterFieldLabel(f))
+                    }
+                }
+            }
+            Spacer(Modifier.width(6.dp))
             OutlinedTextField(
                 value = keyword, onValueChange = { keyword = it },
                 label = { Text(tr("plu.search")) },
                 modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(6.dp))
-            var deptExpanded by remember { mutableStateOf(false) }
-            val depts = state.pluService.all().map { it.mainGroup }.distinct().sorted()
+            // 类别筛选下拉（显示类别名称）
+            var catExpanded by remember { mutableStateOf(false) }
             OutlinedTextField(
-                value = deptFilter?.toString() ?: tr("plu.filterDept"),
+                value = categoryFilter?.let { "$it ${categoryNames[it] ?: ""}" } ?: tr("plu.filterDept"),
                 onValueChange = {}, readOnly = true, label = { Text(tr("plu.field.group")) },
-                modifier = Modifier.width(130.dp),
-                trailingIcon = { TextButton(onClick = { deptExpanded = true }) { Text("▾") } },
+                modifier = Modifier.width(140.dp),
+                trailingIcon = { TextButton(onClick = { catExpanded = true }) { Text("▾") } },
             )
-            DropdownMenu(deptExpanded, { deptExpanded = false }) {
-                DropdownMenuItem(onClick = { deptFilter = null; deptExpanded = false }) { Text(tr("plu.filterDept")) }
-                depts.forEach { d ->
-                    DropdownMenuItem(onClick = { deptFilter = d; deptExpanded = false }) { Text(d.toString()) }
+            DropdownMenu(catExpanded, { catExpanded = false }) {
+                DropdownMenuItem(onClick = { categoryFilter = null; catExpanded = false }) { Text(tr("plu.filterDept")) }
+                categories.forEach { cat ->
+                    DropdownMenuItem(onClick = { categoryFilter = cat.no; catExpanded = false }) {
+                        Text("${cat.no} ${cat.name}")
+                    }
                 }
             }
+            Spacer(Modifier.width(6.dp))
+            // 类别资料入口（对齐顶尖「类别资料」）
+            Button(onClick = { showCategory = true }) { Text(tr("category.title")) }
             Spacer(Modifier.width(6.dp))
             Button(onClick = { editing = PluItem(pluNo = (state.pluService.count() + 1)); showEditor = true }) {
                 Text(tr("plu.add"))
@@ -107,7 +145,7 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
                 }
             }) { Text(tr("plu.download.selected")) }
         }
-        // ---- 次工具栏：自动生成热键 / 导入 / 导出 ----
+        // ---- 次工具栏：状态 / 自动生成热键 / 导入 / 导出 ----
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (recallMessage.isNotBlank()) {
                 Text(recallMessage, fontSize = 12.sp, color = Color(0xFF2E7D32))
@@ -181,7 +219,7 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
                                 modifier = Modifier.cellPadding(),
                             )
                         } else {
-                            PluCell(index - 1, p, state)
+                            PluCell(index - 1, p, state, categoryNames)
                         }
                     }
                     Divider()
@@ -199,40 +237,60 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
             error
         })
     }
+    if (showCategory) {
+        CategoryDialog(state, onDismiss = { showCategory = false; refresh.value++ })
+    }
     batchResults?.let {
         BatchResultDialog(state, it, onDismiss = { batchResults = null })
     }
 }
 
-/** 列标题（第一列为勾选框；其余顺序对齐 TOP2000，含热键列）。 */
+/** 筛选字段显示名。 */
+private fun filterFieldLabel(field: String): String = when (field) {
+    PluDao.FIELD_BARCODE -> tr("plu.filter.barcode")
+    PluDao.FIELD_PLU -> tr("plu.filter.plu")
+    PluDao.FIELD_NAME -> tr("plu.filter.name")
+    PluDao.FIELD_CATEGORY -> tr("plu.filter.category")
+    else -> tr("plu.filter.all")
+}
+
+/** 列标题（第一列为勾选框；列顺序对齐顶尖 LiNK64 商品资料）。 */
 private fun pluHeaders(): List<String> = listOf(
-    tr("plu.field.group"),
-    tr("plu.field.no"),
-    tr("plu.field.code"),
-    tr("plu.field.name"),
-    tr("plu.field.price"),
-    tr("plu.field.flag"),
-    tr("plu.field.shelf"),
-    tr("plu.field.type"),
-    tr("plu.hotkey"),
-    tr("plu.field.ingredient"),
-    tr("plu.field.specialMsg"),
+    tr("plu.field.group"),       // 类别（名称）
+    tr("plu.field.pluNo"),       // 货号
+    tr("plu.field.code"),        // 条码起始号
+    tr("plu.field.name"),        // 名称1
+    tr("plu.field.price"),       // 单价
+    tr("plu.field.barcodeType"), // 条码类型1
+    tr("plu.field.label1"),      // 主标签编号
+    tr("plu.field.packed"),      // 生产日期
+    tr("plu.field.shelf"),       // 保质期
+    tr("plu.field.shelfUnit"),   // 保质期单位
+    tr("plu.field.nameEn"),      // 名称2
+    tr("plu.field.specialMsg"),  // 信息1
+    tr("plu.field.updated"),     // 修改时间
+    tr("plu.hotkey"),            // 热键
+    tr("plu.field.groupNo"),     // 类别编号
 )
 
 @Composable
-private fun PluCell(index: Int, p: PluItem, state: AppState) {
+private fun PluCell(index: Int, p: PluItem, state: AppState, categoryNames: Map<Int, String>) {
     val text = when (index) {
-        0 -> p.mainGroup.toString()
+        0 -> categoryNames[p.mainGroup] ?: p.mainGroup.toString()
         1 -> p.pluNo.toString()
         2 -> p.eanCode
         3 -> p.displayName
         4 -> Numbers.minorToDisplay(p.unitPrice, state.config.priceDecimals)
-        5 -> p.flagData
-        6 -> p.usedByDate.toString()
-        7 -> if (p.weightFlag == 1) tr("plu.weight.count") else tr("plu.weight.weigh")
-        8 -> p.hotKey.takeIf { it > 0 }?.toString() ?: "-"
-        9 -> summarize(p.ingredientLines)
-        else -> summarize(p.specialMsgLines)
+        5 -> barcodeTypeLabel(p)
+        6 -> p.label1Format.toString()
+        7 -> p.packedDate.toString()
+        8 -> p.usedByDate.toString()
+        9 -> ShelfLifeUnit.fromId(p.shelfLifeUnit).label
+        10 -> p.nameEn
+        11 -> summarize(p.specialMsgLines)
+        12 -> SimpleDateFormat("yy-MM-dd HH:mm", Locale.ROOT).format(Date(p.updatedAt))
+        13 -> p.hotKey.takeIf { it > 0 }?.toString() ?: "-"
+        else -> p.mainGroup.toString()
     }
     Text(
         text,
@@ -241,6 +299,13 @@ private fun PluCell(index: Int, p: PluItem, state: AppState) {
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
+}
+
+/** 条码类型显示（0=EAN，9=ITF，其余显示编号）。 */
+private fun barcodeTypeLabel(p: PluItem): String = when (p.barcodeType) {
+    0 -> "EAN"
+    9 -> "ITF"
+    else -> p.barcodeType.toString()
 }
 
 /** 多行文本取首行做列表摘要，无内容显示 "-"。 */

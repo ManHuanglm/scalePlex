@@ -19,6 +19,20 @@ enum class PluUnit(val id: Int, val label: String) {
 }
 
 /**
+ * 保质期单位（对齐顶尖 LiNK64「保质期单位」列）。
+ * [PluItem.usedByDate] 保存原始数值，下发时统一换算为天（[PluItem.effectiveShelfLifeDays]）。
+ */
+enum class ShelfLifeUnit(val id: Int, val label: String) {
+    DAY(0, "天"),
+    MONTH(1, "月"),
+    HOUR(2, "小时");
+
+    companion object {
+        fun fromId(id: Int): ShelfLifeUnit = entries.firstOrNull { it.id == id } ?: DAY
+    }
+}
+
+/**
  * A single PLU (price look-up) record — the universal商品 record pushed to / read from scales.
  *
  * Modeled from the DIGI SM series PLU definition (see `PLU.pas`, `PLU_Demo1.csv`, `SM.ini`)
@@ -64,6 +78,8 @@ data class PluItem(
     val multiBarcode: String = "",
     /** Shelf-life / used-by days. */
     val usedByDate: Int = 0,
+    /** 保质期单位（天/月/小时，见 [ShelfLifeUnit]），下发统一按 [effectiveShelfLifeDays] 换算。 */
+    val shelfLifeUnit: Int = ShelfLifeUnit.DAY.id,
     val sellByDate: Int = 0,
     val packedDate: Int = 0,
     val label1Format: Int = 0,
@@ -83,6 +99,17 @@ data class PluItem(
     val updatedAt: Long = 0,
 ) {
     val displayName: String get() = name.ifBlank { nameEn }
+
+    /** 保质期换算为天（月×30、小时÷24 向上取整至少 1；0 保持 0），供各品牌驱动下发使用。 */
+    val effectiveShelfLifeDays: Int
+        get() {
+            if (usedByDate <= 0) return 0
+            return when (ShelfLifeUnit.fromId(shelfLifeUnit)) {
+                ShelfLifeUnit.DAY -> usedByDate
+                ShelfLifeUnit.MONTH -> usedByDate * 30
+                ShelfLifeUnit.HOUR -> (usedByDate + 23) / 24
+            }
+        }
 }
 
 /** One named text line on a label, with a brand-specific font number. */

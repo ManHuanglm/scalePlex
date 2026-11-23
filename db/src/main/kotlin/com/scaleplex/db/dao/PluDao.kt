@@ -11,17 +11,26 @@ import com.scaleplex.db.exec
 /** CRUD + paging/filter for the `plu` table. */
 class PluDao(private val db: Database) {
 
+    companion object {
+        /** 筛选字段常量（对齐顶尖筛选字段下拉）。 */
+        const val FIELD_ALL = "all"
+        const val FIELD_PLU = "plu"
+        const val FIELD_NAME = "name"
+        const val FIELD_BARCODE = "barcode"
+        const val FIELD_CATEGORY = "category"
+    }
+
     fun insert(p: PluItem): Long = db.withDb { c ->
         c.insert(
             """INSERT INTO plu (plu_no,name,name_en,weight_flag,unit,main_group,unit_price,member_price,special_price,cost,tare,qty,
                 barcode_type,barcode_format,flag_data,bar_right_data_type,ean_code,multi_barcode,
-                used_by_date,sell_by_date,packed_date,label1_format,label2_format,place_no,tax_rate_no,
+                used_by_date,shelf_life_unit,sell_by_date,packed_date,label1_format,label2_format,place_no,tax_rate_no,
                 commodity_json,ingredient_json,special_msg_json,label_template_id,hot_key,enabled,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             p.pluNo, p.name, p.nameEn, p.weightFlag, p.unit, p.mainGroup, p.unitPrice, p.memberPrice, p.specialPrice,
             p.cost, p.tare, p.qty,
             p.barcodeType, p.barcodeFormat, p.flagData, p.barRightDataType, p.eanCode, p.multiBarcode,
-            p.usedByDate, p.sellByDate, p.packedDate, p.label1Format, p.label2Format, p.placeNo, p.taxRateNo,
+            p.usedByDate, p.shelfLifeUnit, p.sellByDate, p.packedDate, p.label1Format, p.label2Format, p.placeNo, p.taxRateNo,
             JsonCodec.writeTextLines(p.commodityLines), JsonCodec.writeTextLines(p.ingredientLines),
             JsonCodec.writeTextLines(p.specialMsgLines), p.labelTemplateId, p.hotKey,
             if (p.enabled) 1 else 0, p.updatedAt,
@@ -32,13 +41,13 @@ class PluDao(private val db: Database) {
         c.exec(
             """UPDATE plu SET name=?,name_en=?,weight_flag=?,unit=?,main_group=?,unit_price=?,member_price=?,special_price=?,cost=?,tare=?,qty=?,
                 barcode_type=?,barcode_format=?,flag_data=?,bar_right_data_type=?,ean_code=?,multi_barcode=?,
-                used_by_date=?,sell_by_date=?,packed_date=?,label1_format=?,label2_format=?,place_no=?,tax_rate_no=?,
+                used_by_date=?,shelf_life_unit=?,sell_by_date=?,packed_date=?,label1_format=?,label2_format=?,place_no=?,tax_rate_no=?,
                 commodity_json=?,ingredient_json=?,special_msg_json=?,label_template_id=?,hot_key=?,enabled=?,updated_at=?
                 WHERE plu_no=?""",
             p.name, p.nameEn, p.weightFlag, p.unit, p.mainGroup, p.unitPrice, p.memberPrice, p.specialPrice,
             p.cost, p.tare, p.qty,
             p.barcodeType, p.barcodeFormat, p.flagData, p.barRightDataType, p.eanCode, p.multiBarcode,
-            p.usedByDate, p.sellByDate, p.packedDate, p.label1Format, p.label2Format, p.placeNo, p.taxRateNo,
+            p.usedByDate, p.shelfLifeUnit, p.sellByDate, p.packedDate, p.label1Format, p.label2Format, p.placeNo, p.taxRateNo,
             JsonCodec.writeTextLines(p.commodityLines), JsonCodec.writeTextLines(p.ingredientLines),
             JsonCodec.writeTextLines(p.specialMsgLines), p.labelTemplateId, p.hotKey,
             if (p.enabled) 1 else 0, p.updatedAt, p.pluNo,
@@ -71,25 +80,40 @@ class PluDao(private val db: Database) {
         c.query("SELECT * FROM plu WHERE plu_no=?", pluNo) { rs -> map(rs) }.firstOrNull()
     }
 
-    fun count(keyword: String = ""): Int = db.withDb { c ->
-        val like = "%$keyword%"
-        c.query(
-            "SELECT COUNT(*) n FROM plu WHERE ?='' OR plu_no LIKE ? OR name LIKE ? OR name_en LIKE ? OR ean_code LIKE ?",
-            keyword, like, like, like, like,
-        ) { rs -> rs.getInt("n") }.firstOrNull() ?: 0
+    fun count(keyword: String = "", field: String = FIELD_ALL): Int = db.withDb { c ->
+        val (cond, args) = keywordCondition(keyword, field)
+        c.query("SELECT COUNT(*) n FROM plu WHERE $cond", *args.toTypedArray()) { rs -> rs.getInt("n") }
+            .firstOrNull() ?: 0
     }
 
-    /** Paged, filtered listing. [keyword] matches PLU no, name (zh/en) or barcode. */
-    fun list(keyword: String = "", page: Int = 0, pageSize: Int = 50): List<PluItem> = db.withDb { c ->
-        val like = "%$keyword%"
-        val sql = """SELECT * FROM plu
-            WHERE ?='' OR CAST(plu_no AS TEXT) LIKE ? OR name LIKE ? OR name_en LIKE ? OR ean_code LIKE ?
-            ORDER BY plu_no LIMIT ? OFFSET ?"""
-        c.query(sql, keyword, like, like, like, like, pageSize, page * pageSize) { rs -> map(rs) }
+    /** Paged, filtered listing. [keyword] matches the field selected by [field]（对齐顶尖筛选字段下拉）. */
+    fun list(keyword: String = "", page: Int = 0, pageSize: Int = 50, field: String = FIELD_ALL): List<PluItem> = db.withDb { c ->
+        val (cond, args) = keywordCondition(keyword, field)
+        val sql = """SELECT * FROM plu WHERE $cond ORDER BY plu_no LIMIT ? OFFSET ?"""
+        c.query(sql, *args.toTypedArray(), pageSize, page * pageSize) { rs -> map(rs) }
     }
 
     fun all(): List<PluItem> = db.withDb { c ->
         c.query("SELECT * FROM plu ORDER BY plu_no") { rs -> map(rs) }
+    }
+
+    /**
+     * 筛选条件与参数（[field] 为内部常量无注入风险）：
+     * 全部=货号/名称/条码任一匹配；货号/名称/条码/类别编号各按对应列 LIKE（类别同时匹配类别名称）。
+     */
+    private fun keywordCondition(keyword: String, field: String): Pair<String, List<String>> {
+        if (keyword.isBlank()) return "1=1" to emptyList()
+        val like = "%$keyword%"
+        return when (field) {
+            FIELD_PLU -> "CAST(plu_no AS TEXT) LIKE ?" to listOf(like)
+            FIELD_NAME -> "name LIKE ? OR name_en LIKE ?" to listOf(like, like)
+            FIELD_BARCODE -> "ean_code LIKE ? OR multi_barcode LIKE ?" to listOf(like, like)
+            FIELD_CATEGORY ->
+                "CAST(main_group AS TEXT) LIKE ? OR main_group IN (SELECT no FROM category WHERE name LIKE ?)"
+                    .let { it to listOf(like, like) }
+            else -> "CAST(plu_no AS TEXT) LIKE ? OR name LIKE ? OR name_en LIKE ? OR ean_code LIKE ?"
+                .let { it to listOf(like, like, like, like) }
+        }
     }
 
     private fun map(rs: java.sql.ResultSet): PluItem = PluItem(
@@ -113,6 +137,7 @@ class PluDao(private val db: Database) {
         eanCode = rs.getString("ean_code") ?: "",
         multiBarcode = rs.getString("multi_barcode") ?: "",
         usedByDate = rs.getInt("used_by_date"),
+        shelfLifeUnit = rs.getInt("shelf_life_unit"),
         sellByDate = rs.getInt("sell_by_date"),
         packedDate = rs.getInt("packed_date"),
         label1Format = rs.getInt("label1_format"),

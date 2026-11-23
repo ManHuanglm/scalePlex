@@ -37,12 +37,28 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
         title = { Text(if (initial.pluNo > 0 && initial.id > 0) tr("plu.edit") else tr("plu.add")) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()).width(500.dp)) {
-                // ---- 部门号 / PLU编号 ----
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Field(tr("plu.field.group"), plu.mainGroup.toString(), Modifier.weight(1f)) { s ->
-                        s.toIntOrNull()?.let { plu = plu.copy(mainGroup = it) }
+                // ---- 类别（下拉，对齐顶尖类别资料） / PLU编号 ----
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val categories = remember { state.categoryService.all() }
+                    Text(tr("plu.field.group"), Modifier.width(90.dp))
+                    var catExpanded by remember { mutableStateOf(false) }
+                    val selectedCategory = categories.firstOrNull { it.no == plu.mainGroup }
+                    OutlinedTextField(
+                        value = selectedCategory?.let { "${it.no} ${it.name}" } ?: plu.mainGroup.toString(),
+                        onValueChange = {}, readOnly = true, modifier = Modifier.weight(1f),
+                        trailingIcon = { TextButton(onClick = { catExpanded = true }) { Text("▾") } },
+                    )
+                    DropdownMenu(catExpanded, { catExpanded = false }) {
+                        categories.forEach { cat ->
+                            DropdownMenuItem(onClick = { plu = plu.copy(mainGroup = cat.no); catExpanded = false }) {
+                                Text("${cat.no} ${cat.name}")
+                            }
+                        }
+                        if (categories.isEmpty()) {
+                            DropdownMenuItem(onClick = { catExpanded = false }) { Text(tr("category.empty")) }
+                        }
                     }
-                    Field(tr("plu.field.no"), plu.pluNo.toString(), Modifier.weight(1f)) { s ->
+                    Field(tr("plu.field.no"), plu.pluNo.toString(), Modifier.width(110.dp)) { s ->
                         s.toIntOrNull()?.let { plu = plu.copy(pluNo = it) }
                     }
                 }
@@ -62,11 +78,25 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                         modifier = Modifier.width(120.dp),
                     )
                 }
-                // ---- F1F2 / 保质期 ----
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // ---- F1F2 / 保质期 / 保质期单位 ----
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Field(tr("plu.field.flag"), plu.flagData, Modifier.weight(1f)) { plu = plu.copy(flagData = it) }
                     Field(tr("plu.field.shelf"), plu.usedByDate.toString(), Modifier.weight(1f)) { s ->
                         s.toIntOrNull()?.let { plu = plu.copy(usedByDate = it.coerceAtLeast(0)) }
+                    }
+                    Text(tr("plu.field.shelfUnit"), Modifier.width(70.dp))
+                    var shelfUnitExpanded by remember { mutableStateOf(false) }
+                    OutlinedTextField(
+                        value = com.scaleplex.core.model.ShelfLifeUnit.fromId(plu.shelfLifeUnit).label,
+                        onValueChange = {}, readOnly = true, modifier = Modifier.width(90.dp),
+                        trailingIcon = { TextButton(onClick = { shelfUnitExpanded = true }) { Text("▾") } },
+                    )
+                    DropdownMenu(shelfUnitExpanded, { shelfUnitExpanded = false }) {
+                        com.scaleplex.core.model.ShelfLifeUnit.entries.forEach { u ->
+                            DropdownMenuItem(onClick = {
+                                plu = plu.copy(shelfLifeUnit = u.id); shelfUnitExpanded = false
+                            }) { Text(u.label) }
+                        }
                     }
                 }
                 // ---- 商品名称 ----

@@ -6,7 +6,6 @@ import com.scaleplex.core.util.ValidationResult
 import com.scaleplex.db.Database
 import com.scaleplex.db.dao.PluDao
 import org.slf4j.LoggerFactory
-
 /**
  * PLU business service: CRUD, validation, batch import and bulk edits.
  * Wraps [PluDao]; the UI never touches the DAO directly.
@@ -36,8 +35,9 @@ class PluService(db: Database) {
     fun delete(pluNo: Int) = dao.deleteByPluNo(pluNo)
     fun deleteAll() = dao.deleteAll()
     fun get(pluNo: Int) = dao.findByPluNo(pluNo)
-    fun count(keyword: String = "") = dao.count(keyword)
-    fun list(keyword: String = "", page: Int = 0, pageSize: Int = 50) = dao.list(keyword, page, pageSize)
+    fun count(keyword: String = "", field: String = PluDao.FIELD_ALL) = dao.count(keyword, field)
+    fun list(keyword: String = "", page: Int = 0, pageSize: Int = 50, field: String = PluDao.FIELD_ALL) =
+        dao.list(keyword, page, pageSize, field)
     fun all() = dao.all()
 
     /** Bulk edit: apply [transform] to the selected PLUs and persist. */
