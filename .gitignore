@@ -14,6 +14,9 @@ local.properties
 *.msi
 *.exe
 
+# 便携版构建产物
+/ScalePlex-*-portable.zip
+
 # 系统文件
 .DS_Store
 Thumbs.db
