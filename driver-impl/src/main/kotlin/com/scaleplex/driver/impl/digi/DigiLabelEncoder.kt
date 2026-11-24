@@ -46,12 +46,25 @@ object DigiLabelEncoder {
         LabelElementKind.TAXED_PRICE -> 0x10
         LabelElementKind.TAX -> 0x11
         LabelElementKind.FRAME -> 0x12
-        // 托利多体系专有字段（第二品名/广告用语/固定重量/皮重/追溯码），DIGI 无对应数据域
+        // 托利多 / 顶尖体系专有字段，DIGI 无对应数据域
         LabelElementKind.SECOND_NAME,
         LabelElementKind.ADVERTISEMENT,
         LabelElementKind.FIXED_WEIGHT,
         LabelElementKind.TARE_WEIGHT,
         LabelElementKind.TRACE_CODE,
+        LabelElementKind.THIRD_NAME,
+        LabelElementKind.REMARK_1,
+        LabelElementKind.REMARK_2,
+        LabelElementKind.REMARK_3,
+        LabelElementKind.REMARK_4,
+        LabelElementKind.TEXT_TITLE,
+        LabelElementKind.TEXT_CONTENT,
+        LabelElementKind.PREPACK_DISCOUNT,
+        LabelElementKind.TEMPERATURE,
+        LabelElementKind.GROSS_WEIGHT,
+        LabelElementKind.NET_WEIGHT,
+        LabelElementKind.PRODUCTION_DATE,
+        LabelElementKind.SHELF_LIFE,
         LabelElementKind.LOGO,
         -> null
     }

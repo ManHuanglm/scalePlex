@@ -96,6 +96,45 @@ enum class LabelElementKind {
 
     /** 追溯码。 */
     TRACE_CODE,
+
+    /** 第三品名（顶尖 Aclas：单品名称3）。 */
+    THIRD_NAME,
+
+    /** 备注1（顶尖 Aclas）。 */
+    REMARK_1,
+
+    /** 备注2。 */
+    REMARK_2,
+
+    /** 备注3。 */
+    REMARK_3,
+
+    /** 备注4。 */
+    REMARK_4,
+
+    /** 文本信息标题头（顶尖 Aclas：文本信息1(标题头)）。 */
+    TEXT_TITLE,
+
+    /** 文本信息内容（顶尖 Aclas：文本信息1(内容)）。 */
+    TEXT_CONTENT,
+
+    /** 预包装折扣。 */
+    PREPACK_DISCOUNT,
+
+    /** 温度。 */
+    TEMPERATURE,
+
+    /** 毛重。 */
+    GROSS_WEIGHT,
+
+    /** 净重。 */
+    NET_WEIGHT,
+
+    /** 生产日期。 */
+    PRODUCTION_DATE,
+
+    /** 保质期。 */
+    SHELF_LIFE,
 }
 
 data class LabelElement(

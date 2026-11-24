@@ -106,10 +106,19 @@ class AclasDriver(
 
     override suspend fun readLabelFormats(): Result<List<LabelTemplate>> =
         // 标签格式在 AclasLabelDrawSDK（83MB 绘制 SDK）内，结构未公开且需专用编辑器。
-        Result.failure(UnsupportedOperationException("顶尖标签格式回收需 AclasLabelDrawSDK 支持，暂未接入"))
+        Result.failure(
+            UnsupportedOperationException(
+                "顶尖标签格式回收需 AclasLabelDrawSDK 支持，暂未接入；可在「标签模板」中选择「顶尖 Aclas」体系进行本地设计",
+            ),
+        )
 
     override suspend fun downloadLabelTemplate(template: LabelTemplate): Result<Unit> =
-        Result.failure(UnsupportedOperationException("顶尖标签格式下发需 AclasLabelDrawSDK 支持，暂未接入"))
+        Result.failure(
+            UnsupportedOperationException(
+                "顶尖标签格式下发需 AclasLabelDrawSDK 支持，暂未接入；" +
+                    "可在「标签模板」中选择「顶尖 Aclas」体系进行本地设计，秤端标签格式请使用 Aclas 官方编辑器维护",
+            ),
+        )
 
     override suspend fun syncTime(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {

@@ -177,7 +177,7 @@ fun LabelEditorDialog(
                     OutlinedButton(onClick = {
                         importJson()?.let { imported -> template = imported; selected = null }
                     }) { Text(tr("label.importJson")) }
-                    Button(enabled = !template.system.isMettler, onClick = {
+                    Button(enabled = template.system.canDownloadTemplate, onClick = {
                         scope.launch {
                             batchResults = state.scaleService.downloadLabelToDevices(
                                 state.scaleService.devices().filter { it.enabled }, template,
@@ -268,7 +268,11 @@ fun LabelEditorDialog(
                 }
 
                 Text(
-                    if (template.system.isMettler) tr("label.mtHint") else tr("label.selectHint"),
+                    when {
+                        template.system.isMettler -> tr("label.mtHint")
+                        template.system == LabelSystem.DINGTOP -> tr("label.dingtopHint")
+                        else -> tr("label.selectHint")
+                    },
                     fontSize = 11.sp,
                     color = Color(0xFF808080),
                 )
