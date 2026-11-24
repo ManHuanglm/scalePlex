@@ -14,6 +14,7 @@ import androidx.compose.ui.window.rememberWindowState
 import com.scaleplex.app.ui.ScalePlexApp
 import com.scaleplex.app.ui.Theme
 import com.scaleplex.core.i18n.I18n
+import com.scaleplex.core.model.ScaleConfig
 import com.scaleplex.db.Database
 import com.scaleplex.driver.impl.DriverRegistry
 import com.scaleplex.service.ConfigService
@@ -41,7 +42,7 @@ fun main() {
     val db = Database(File(dataDir, "scaleplex.db"))
 
     val configService = ConfigService(db)
-    val config = configService.load()
+    val config = applyToolDefaults(configService.load(), toolsDir)
     configService.applyLocale(config.language)
 
     application {
@@ -81,3 +82,38 @@ private fun usable(dir: File): Boolean = try {
 } catch (_: Exception) {
     false
 }
+
+/**
+ * 官方工具默认路径：配置为空时填入随程序释放的内置工具目录
+ * （data/tools/<brand>）或自动探测到的 Scale Manager 安装目录，
+ * 系统设置页即可直接看到实际路径。
+ */
+private fun applyToolDefaults(config: ScaleConfig, toolsDir: File): ScaleConfig {
+    val defaults = config.copy(
+        digiToolsPath = config.digiToolsPath.ifBlank { existingDir(File(toolsDir, "digi")) },
+        dahuaToolsPath = config.dahuaToolsPath.ifBlank { existingDir(File(toolsDir, "dahua")) },
+        aclasToolsPath = config.aclasToolsPath.ifBlank { existingDir(File(toolsDir, "aclas")) },
+        mtApiDllPath = config.mtApiDllPath.ifBlank {
+            File(toolsDir, "mettler/MTScaleAPI.dll").takeIf { it.isFile }?.absolutePath ?: ""
+        },
+        mtScaleManagerPath = config.mtScaleManagerPath.ifBlank {
+            MtLabelEditorLauncher.resolveRoot("")?.absolutePath ?: ""
+        },
+    )
+    // 同步给驱动桥接（与系统设置保存后的行为一致）
+    if (defaults.digiToolsPath.isNotBlank()) {
+        System.setProperty("scaleplex.digi.tools", defaults.digiToolsPath)
+    }
+    if (defaults.dahuaToolsPath.isNotBlank()) {
+        System.setProperty("scaleplex.dahua.tools", defaults.dahuaToolsPath)
+    }
+    if (defaults.aclasToolsPath.isNotBlank()) {
+        System.setProperty("scaleplex.aclas.tools", defaults.aclasToolsPath)
+    }
+    if (defaults.mtApiDllPath.isNotBlank()) {
+        System.setProperty("scaleplex.mt.dll", defaults.mtApiDllPath)
+    }
+    return defaults
+}
+
+private fun existingDir(dir: File): String = dir.takeIf { it.isDirectory }?.absolutePath ?: ""
