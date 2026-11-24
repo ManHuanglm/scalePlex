@@ -1,6 +1,25 @@
 package com.scaleplex.core.model
 
 /**
+ * 顶尖（Aclas）已知机型清单（来源：LINK69 机型选择列表）。
+ * 型号仅用于展示与区分机型；通信协议由 AclasSDK GetDevicesInfo 自协商。
+ */
+val DINGTOP_MODELS: List<String> = listOf(
+    "LS2X/LS3X标签秤",
+    "LS2SX自助秤",
+    "LH1X吊挂秤",
+    "LS6X标签秤",
+    "LS5SX自助秤",
+    "LS5X有杆标签秤",
+    "LS5X无杆标签秤",
+    "LP1X标签打印机",
+    "LP54标签打印机",
+    "TSX触控秤",
+    "BS7有线基站",
+    "HT4手持终端机",
+)
+
+/**
  * Supported scale brands / drivers. Each brand maps to one [com.scaleplex.driver.api.IScaleDriver]
  * implementation registered in the [com.scaleplex.driver.api.ScaleDriverFactory].
  *
@@ -26,6 +45,13 @@ enum class ScaleBrand(val id: String, val displayName: String, val defaultPort: 
     ISHIDA("ishida", "石田 Ishida", 1111),
     BIZERBA("bizerba", "碧彩 Bizerba", 1111),
     GENERIC("generic", "通用 / 其他", 1111);
+
+    /** 该品牌可选机型；空列表表示无预设机型，自由输入。 */
+    val models: List<String>
+        get() = when (this) {
+            DINGTOP -> DINGTOP_MODELS
+            else -> emptyList()
+        }
 
     companion object {
         fun fromId(id: String): ScaleBrand =

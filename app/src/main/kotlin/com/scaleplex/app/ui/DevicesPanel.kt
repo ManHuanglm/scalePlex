@@ -344,11 +344,6 @@ private fun DeviceEditorDialog(
                     label = { Text(tr("device.field.name")) },
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                 )
-                OutlinedTextField(
-                    dev.model, { dev = dev.copy(model = it) },
-                    label = { Text(tr("device.field.model")) },
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                )
 
                 var brandExpanded by remember { mutableStateOf(false) }
                 OutlinedTextField(
@@ -364,6 +359,36 @@ private fun DeviceEditorDialog(
                             dev = dev.copy(brand = b, port = b.defaultPort)
                             brandExpanded = false
                         }) { Text(b.displayName) }
+                    }
+                }
+
+                // 型号：有预设机型的品牌（如顶尖）提供下拉选择，仍可手动输入
+                val modelOptions = dev.brand.models
+                if (modelOptions.isEmpty()) {
+                    OutlinedTextField(
+                        dev.model, { dev = dev.copy(model = it) },
+                        label = { Text(tr("device.field.model")) },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    )
+                } else {
+                    var modelExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        OutlinedTextField(
+                            dev.model, { dev = dev.copy(model = it) },
+                            label = { Text(tr("device.field.model")) },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            trailingIcon = {
+                                TextButton(onClick = { modelExpanded = true }) { Text("▾") }
+                            },
+                        )
+                        DropdownMenu(modelExpanded, { modelExpanded = false }) {
+                            modelOptions.forEach { model ->
+                                DropdownMenuItem(onClick = {
+                                    dev = dev.copy(model = model)
+                                    modelExpanded = false
+                                }) { Text(model) }
+                            }
+                        }
                     }
                 }
 
