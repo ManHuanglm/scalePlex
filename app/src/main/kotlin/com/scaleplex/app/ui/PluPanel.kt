@@ -1,7 +1,8 @@
 package com.scaleplex.app.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.Button
 import androidx.compose.material.Checkbox
 import androidx.compose.material.Divider
@@ -22,6 +25,7 @@ import androidx.compose.material.OutlinedButton
 import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -31,7 +35,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -85,7 +101,25 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
     var showCategory by remember { mutableStateOf(false) }
     var batchResults by remember { mutableStateOf<Map<Long, BatchResult>?>(null) }
     var recallMessage by remember { mutableStateOf("") }
+    var selectedPluNo by remember { mutableStateOf<Int?>(null) }
+    var inlineEdit by remember { mutableStateOf<InlineEdit?>(null) }
+    var inlineMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+
+    /** 提交单格编辑：解析失败或保存失败时保留列表原值并提示原因。 */
+    fun commitInlineEdit(plu: PluItem, column: Int, input: String) {
+        val updated = applyCellEdit(plu, column, input, state.config.priceDecimals)
+        if (updated == null) {
+            inlineMessage = tr("plu.inlineInvalid")
+        } else {
+            state.pluService.save(updated).fold(
+                onSuccess = { inlineMessage = ""; refresh.value++ },
+                onFailure = { inlineMessage = tr("plu.inlineSaveFailed") + (it.message ?: "") },
+            )
+        }
+        inlineEdit = null
+    }
 
     val table = rememberTableState(
         listOf(
@@ -185,8 +219,17 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
             }
         }
 
-        // ---- 次要操作区：类别资料 / 自动热键 / 导入 / 导出 ----
+        // ---- 次要操作区：编辑选中 / 类别资料 / 自动热键 / 导入 / 导出 ----
         ToolbarRow {
+            OutlinedButton(
+                enabled = selectedPluNo != null,
+                onClick = {
+                    plus.firstOrNull { it.pluNo == selectedPluNo }?.let {
+                        editing = it
+                        showEditor = true
+                    }
+                },
+            ) { Text(tr("plu.editSelected")) }
             OutlinedButton(onClick = { showCategory = true }) { Text(tr("category.title")) }
             OutlinedButton(onClick = {
                 // 勾选优先，无勾选则按当前列表顺序依次编 1..N（参考银豹「自动生成热键」）
@@ -227,6 +270,21 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
             )
         }
 
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                tr("plu.inlineHint"),
+                fontSize = 11.sp,
+                color = MaterialTheme.colors.onSurface.copy(alpha = 0.55f),
+            )
+            if (inlineMessage.isNotBlank()) {
+                Spacer(Modifier.width(12.dp))
+                Text(inlineMessage, fontSize = 12.sp, color = UiColors.Error)
+            }
+        }
+
         // ---- 表格（列宽拖拽 + 横纵滚动条）----
         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             ScrollableTable(
@@ -255,15 +313,49 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
                 items(plus.size, key = { plus[it].pluNo }) { i ->
                     val p = plus[i]
                     val (hoverSource, hovered) = rememberRowHover()
+                    val widthsPx = table.widths.map { with(density) { it.toPx() } }
                     TableRow(
                         table,
                         modifier = Modifier
                             .background(
-                                if (hovered) MaterialTheme.colors.primary.copy(alpha = 0.06f)
-                                else Color.Transparent,
+                                when {
+                                    selectedPluNo == p.pluNo -> MaterialTheme.colors.primary.copy(alpha = 0.10f)
+                                    hovered -> MaterialTheme.colors.primary.copy(alpha = 0.06f)
+                                    else -> Color.Transparent
+                                },
                             )
                             .hoverable(hoverSource)
-                            .clickable { editing = p; showEditor = true },
+                            // 单击选中；双击单元格进入单格编辑（只读列双击打开完整编辑窗口）
+                            .pointerInput(p.pluNo, widthsPx) {
+                                detectTapGestures(
+                                    onTap = { if (inlineEdit == null) selectedPluNo = p.pluNo },
+                                    onDoubleTap = doubleTap@{ offset ->
+                                        if (inlineEdit != null) return@doubleTap
+                                        var acc = 0f
+                                        var column = -1
+                                        for ((idx, width) in widthsPx.withIndex()) {
+                                            if (offset.x < acc + width) {
+                                                column = idx
+                                                break
+                                            }
+                                            acc += width
+                                        }
+                                        val cell = column - 1
+                                        if (cell >= 0) {
+                                            if (cell in EDITABLE_COLUMNS) {
+                                                inlineEdit = InlineEdit(
+                                                    pluNo = p.pluNo,
+                                                    column = cell,
+                                                    value = cellText(cell, p, state, categoryNames),
+                                                )
+                                            } else {
+                                                editing = p
+                                                showEditor = true
+                                            }
+                                        }
+                                    },
+                                )
+                            },
                     ) { index, _ ->
                         if (index == 0) {
                             Checkbox(
@@ -274,7 +366,18 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
                                 modifier = Modifier.cellPadding(),
                             )
                         } else {
-                            PluCell(index - 1, p, state, categoryNames)
+                            val column = index - 1
+                            PluCell(
+                                column = column,
+                                p = p,
+                                state = state,
+                                categoryNames = categoryNames,
+                                editing = inlineEdit?.takeIf {
+                                    it.pluNo == p.pluNo && it.column == column
+                                },
+                                onCommit = { input -> commitInlineEdit(p, column, input) },
+                                onCancel = { inlineEdit = null },
+                            )
                         }
                     }
                     Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.08f))
@@ -349,32 +452,139 @@ private fun pluHeaders(): List<String> = listOf(
     tr("plu.field.groupNo"),     // 类别编号
 )
 
+/** 可双击直接编辑的列（0 起，首列勾选框除外）。 */
+private val EDITABLE_COLUMNS = setOf(2, 3, 4, 5, 6, 7, 8, 10, 13, 14)
+
+/** 正在内联编辑的单格。 */
+private data class InlineEdit(val pluNo: Int, val column: Int, val value: String)
+
 @Composable
-private fun PluCell(index: Int, p: PluItem, state: AppState, categoryNames: Map<Int, String>) {
-    val text = when (index) {
-        0 -> categoryNames[p.mainGroup] ?: p.mainGroup.toString()
-        1 -> p.pluNo.toString()
-        2 -> p.eanCode
-        3 -> p.displayName
-        4 -> Numbers.minorToDisplay(p.unitPrice, state.config.priceDecimals)
-        5 -> barcodeTypeLabel(p)
-        6 -> p.label1Format.toString()
-        7 -> p.packedDate.toString()
-        8 -> p.usedByDate.toString()
-        9 -> ShelfLifeUnit.fromId(p.shelfLifeUnit).label
-        10 -> p.nameEn
-        11 -> summarize(p.specialMsgLines)
-        12 -> SimpleDateFormat("yy-MM-dd HH:mm", Locale.ROOT).format(Date(p.updatedAt))
-        13 -> p.hotKey.takeIf { it > 0 }?.toString() ?: "-"
-        else -> p.mainGroup.toString()
+private fun PluCell(
+    column: Int,
+    p: PluItem,
+    state: AppState,
+    categoryNames: Map<Int, String>,
+    editing: InlineEdit?,
+    onCommit: (String) -> Unit,
+    onCancel: () -> Unit,
+) {
+    if (editing != null) {
+        InlineCellEditor(initial = editing.value, onCommit = onCommit, onCancel = onCancel)
+        return
     }
     Text(
-        text,
-        Modifier.cellPadding(),
+        cellText(column, p, state, categoryNames),
+        Modifier.cellPadding().fillMaxWidth(),
         fontSize = 12.sp,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
+}
+
+/** 单格显示值（列表与内联编辑共用）。 */
+private fun cellText(
+    column: Int,
+    p: PluItem,
+    state: AppState,
+    categoryNames: Map<Int, String>,
+): String = when (column) {
+    0 -> categoryNames[p.mainGroup] ?: p.mainGroup.toString()
+    1 -> p.pluNo.toString()
+    2 -> p.eanCode
+    3 -> p.displayName
+    4 -> Numbers.minorToDisplay(p.unitPrice, state.config.priceDecimals)
+    5 -> barcodeTypeLabel(p)
+    6 -> p.label1Format.toString()
+    7 -> p.packedDate.toString()
+    8 -> p.usedByDate.toString()
+    9 -> ShelfLifeUnit.fromId(p.shelfLifeUnit).label
+    10 -> p.nameEn
+    11 -> summarize(p.specialMsgLines)
+    12 -> SimpleDateFormat("yy-MM-dd HH:mm", Locale.ROOT).format(Date(p.updatedAt))
+    13 -> p.hotKey.takeIf { it > 0 }?.toString() ?: "-"
+    else -> p.mainGroup.toString()
+}
+
+/** 将单格输入写回 PLU；返回 null 表示输入格式不合法。 */
+private fun applyCellEdit(p: PluItem, column: Int, input: String, priceDecimals: Int): PluItem? {
+    val text = input.trim()
+    return when (column) {
+        2 -> p.copy(eanCode = text)
+        3 -> p.copy(name = text)
+        4 -> if (Numbers.parseDouble(text) != null) {
+            p.copy(unitPrice = Numbers.displayToMinor(text, priceDecimals))
+        } else {
+            null
+        }
+        5 -> text.toIntOrNull()?.let { p.copy(barcodeType = it) }
+        6 -> text.toIntOrNull()?.let { p.copy(label1Format = it) }
+        7 -> text.toIntOrNull()?.let { p.copy(packedDate = it) }
+        8 -> text.toIntOrNull()?.let { p.copy(usedByDate = it.coerceAtLeast(0)) }
+        10 -> p.copy(nameEn = text)
+        13 -> text.toIntOrNull()?.let { p.copy(hotKey = it.coerceIn(0, 999)) }
+        14 -> text.toIntOrNull()?.let { p.copy(mainGroup = it) }
+        else -> null
+    }
+}
+
+/** 单元格内联编辑框：Enter 提交、Esc 取消、失焦提交。 */
+@Composable
+private fun InlineCellEditor(initial: String, onCommit: (String) -> Unit, onCancel: () -> Unit) {
+    var text by remember(initial) { mutableStateOf(initial) }
+    var finished by remember { mutableStateOf(false) }
+    var hadFocus by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+
+    fun commit() {
+        if (!finished) {
+            finished = true
+            onCommit(text)
+        }
+    }
+
+    fun cancel() {
+        if (!finished) {
+            finished = true
+            onCancel()
+        }
+    }
+
+    BasicTextField(
+        value = text,
+        onValueChange = { text = it },
+        singleLine = true,
+        textStyle = TextStyle(fontSize = 12.sp, color = MaterialTheme.colors.onSurface),
+        cursorBrush = SolidColor(MaterialTheme.colors.primary),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 3.dp)
+            .border(1.dp, MaterialTheme.colors.primary, RoundedCornerShape(2.dp))
+            .background(MaterialTheme.colors.surface)
+            .padding(horizontal = 6.dp, vertical = 5.dp)
+            .focusRequester(focusRequester)
+            .onFocusChanged { state ->
+                if (state.isFocused) {
+                    hadFocus = true
+                } else if (hadFocus && !finished) {
+                    commit()
+                }
+            }
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key.Enter, Key.NumPadEnter -> {
+                        commit()
+                        true
+                    }
+                    Key.Escape -> {
+                        cancel()
+                        true
+                    }
+                    else -> false
+                }
+            },
+    )
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 }
 
 /** 条码类型显示（0=EAN，9=ITF，其余显示编号）。 */
