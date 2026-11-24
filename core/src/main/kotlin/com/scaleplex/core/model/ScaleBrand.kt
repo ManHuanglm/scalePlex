@@ -20,6 +20,26 @@ val DINGTOP_MODELS: List<String> = listOf(
 )
 
 /**
+ * 托利多（Mettler Toledo）ScaleKey 机型清单（来源：ScaleKey 机型选择列表）。
+ * 型号即 XML 任务中的 ScaleType，需与秤端实际机型一致。
+ */
+val METTLER_MODELS: List<String> = listOf(
+    "8442",
+    "PC[Apollo]",
+    "bCom",
+    "bComS",
+    "bHigh",
+    "bMobile",
+    "bPlus",
+    "bPro",
+    "bTwin",
+    "Etica",
+    "FreshBase",
+    "I15",
+    "RL00/RL00+",
+)
+
+/**
  * Supported scale brands / drivers. Each brand maps to one [com.scaleplex.driver.api.IScaleDriver]
  * implementation registered in the [com.scaleplex.driver.api.ScaleDriverFactory].
  *
@@ -50,6 +70,7 @@ enum class ScaleBrand(val id: String, val displayName: String, val defaultPort: 
     val models: List<String>
         get() = when (this) {
             DINGTOP -> DINGTOP_MODELS
+            METTLER_TOLEDO -> METTLER_MODELS
             else -> emptyList()
         }
 
