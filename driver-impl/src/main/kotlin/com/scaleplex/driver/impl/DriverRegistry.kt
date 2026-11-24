@@ -2,12 +2,8 @@ package com.scaleplex.driver.impl
 
 import com.scaleplex.core.model.ScaleBrand
 import com.scaleplex.driver.api.ScaleDriverFactory
-import com.scaleplex.driver.impl.aclas.AclasDriver
 import com.scaleplex.driver.impl.dahua.DahuaDriver
 import com.scaleplex.driver.impl.digi.DigiSmDriver
-import com.scaleplex.driver.impl.hihong.HiHongUdpDriver
-import com.scaleplex.driver.impl.mettler.MettlerToledoDriver
-import com.scaleplex.driver.impl.yousheng.YouShengDriver
 
 /**
  * Registers all concrete drivers with [ScaleDriverFactory]. Call [install] once at
@@ -24,12 +20,6 @@ object DriverRegistry {
             if (installed) return
             ScaleDriverFactory.register(ScaleBrand.DIGI) { device -> DigiSmDriver(device) }
             ScaleDriverFactory.register(ScaleBrand.DAHUA) { device -> DahuaDriver(device) }
-            ScaleDriverFactory.register(ScaleBrand.HIHONG) { device -> HiHongUdpDriver(device) }
-            ScaleDriverFactory.register(ScaleBrand.YOUSHENG) { device -> YouShengDriver(device) }
-            // 托利多骨架驱动：仅注册品牌避免选择后崩溃，协议待实体秤联调
-            ScaleDriverFactory.register(ScaleBrand.METTLER_TOLEDO) { device -> MettlerToledoDriver(device) }
-            // 顶尖 Aclas：官方 AclasSDK.dll 桥接（PLU 下发/回收/清空/设备探测）
-            ScaleDriverFactory.register(ScaleBrand.DINGTOP) { device -> AclasDriver(device) }
             installed = true
         }
     }
