@@ -1,5 +1,6 @@
 package com.scaleplex.db.dao
 
+import com.scaleplex.core.model.LabelSystem
 import com.scaleplex.core.model.LabelTemplate
 import com.scaleplex.db.Database
 import com.scaleplex.db.JsonCodec
@@ -12,15 +13,15 @@ class LabelTemplateDao(private val db: Database) {
 
     fun insert(t: LabelTemplate): Long = db.withDb { c ->
         c.insert(
-            "INSERT INTO label_template (name,width_mm,height_mm,elements_json,note) VALUES (?,?,?,?,?)",
-            t.name, t.widthMm, t.heightMm, JsonCodec.writeElements(t.elements), t.note,
+            "INSERT INTO label_template (name,width_mm,height_mm,elements_json,note,label_system) VALUES (?,?,?,?,?,?)",
+            t.name, t.widthMm, t.heightMm, JsonCodec.writeElements(t.elements), t.note, t.system.name,
         )
     }
 
     fun update(t: LabelTemplate): Int = db.withDb { c ->
         c.exec(
-            "UPDATE label_template SET name=?,width_mm=?,height_mm=?,elements_json=?,note=? WHERE id=?",
-            t.name, t.widthMm, t.heightMm, JsonCodec.writeElements(t.elements), t.note, t.id,
+            "UPDATE label_template SET name=?,width_mm=?,height_mm=?,elements_json=?,note=?,label_system=? WHERE id=?",
+            t.name, t.widthMm, t.heightMm, JsonCodec.writeElements(t.elements), t.note, t.system.name, t.id,
         )
     }
 
@@ -45,5 +46,6 @@ class LabelTemplateDao(private val db: Database) {
         heightMm = rs.getInt("height_mm"),
         elements = JsonCodec.readElements(rs.getString("elements_json") ?: "[]"),
         note = rs.getString("note") ?: "",
+        system = LabelSystem.fromId(rs.getString("label_system") ?: "GENERIC"),
     )
 }

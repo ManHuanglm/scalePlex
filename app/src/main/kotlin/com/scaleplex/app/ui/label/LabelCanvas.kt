@@ -277,8 +277,12 @@ private fun displayText(element: LabelElement): String = when (element.kind) {
     LabelElementKind.PLU_NO -> "0001"
     LabelElementKind.QUANTITY -> "×1"
     LabelElementKind.QUANTITY_SYMBOL -> "kg"
-    LabelElementKind.INGREDIENT, LabelElementKind.SPECIAL_MSG ->
-        element.text.ifBlank { tr("label.kind." + element.kind.name) }
+    LabelElementKind.INGREDIENT, LabelElementKind.SPECIAL_MSG,
+    LabelElementKind.SECOND_NAME, LabelElementKind.ADVERTISEMENT,
+    -> element.text.ifBlank { tr("label.kind." + element.kind.name) }
+    LabelElementKind.FIXED_WEIGHT -> "1.000 kg"
+    LabelElementKind.TARE_WEIGHT -> "T 0.005"
+    LabelElementKind.TRACE_CODE -> "||| TRACE"
     LabelElementKind.MAIN_GROUP -> "997"
     LabelElementKind.DATE -> element.text.ifBlank { "2026-01-01" }
     LabelElementKind.LOGO -> tr("label.kind.LOGO")

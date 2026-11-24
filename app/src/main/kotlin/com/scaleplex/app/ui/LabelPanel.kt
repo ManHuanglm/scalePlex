@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.Button
 import androidx.compose.material.Divider
+import androidx.compose.material.DropdownMenu
+import androidx.compose.material.DropdownMenuItem
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.OutlinedButton
 import androidx.compose.material.Text
@@ -39,6 +41,7 @@ import com.scaleplex.app.ui.table.cellPadding
 import com.scaleplex.app.ui.table.rememberRowHover
 import com.scaleplex.app.ui.table.rememberTableState
 import com.scaleplex.core.i18n.tr
+import com.scaleplex.core.model.LabelSystem
 import com.scaleplex.core.model.LabelTemplate
 import kotlinx.coroutines.launch
 
@@ -52,7 +55,7 @@ fun LabelPanel(state: AppState, refresh: MutableState<Int>) {
     var editing by remember { mutableStateOf<LabelTemplate?>(null) }
     var recallMessage by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    val table = rememberTableState(listOf(280.dp, 150.dp, 110.dp, 160.dp))
+    val table = rememberTableState(listOf(250.dp, 150.dp, 130.dp, 90.dp, 160.dp))
 
     Column(modifier = Modifier.fillMaxSize()) {
         PanelHeader(
@@ -77,12 +80,28 @@ fun LabelPanel(state: AppState, refresh: MutableState<Int>) {
                     refresh.value++
                 }
             }) { Text(tr("label.recall")) }
-            Button(onClick = {
-                state.labelService.save(
-                    LabelTemplate(name = "New Label ${templates.size + 1}", widthMm = 40, heightMm = 30),
-                )
-                refresh.value++
-            }) { Text(tr("label.new")) }
+            // 新建标签：先选标签体系（通用 / 托利多 VisEdit / bLabel / SmartLabel）
+            Box {
+                var newExpanded by remember { mutableStateOf(false) }
+                Button(onClick = { newExpanded = true }) { Text(tr("label.new")) }
+                DropdownMenu(newExpanded, { newExpanded = false }) {
+                    LabelSystem.entries.forEach { system ->
+                        DropdownMenuItem(onClick = {
+                            val seq = templates.count { it.system == system } + 1
+                            state.labelService.save(
+                                LabelTemplate(
+                                    name = tr("label.system." + system.name) + " " + seq,
+                                    widthMm = system.defaultWidthMm,
+                                    heightMm = system.defaultHeightMm,
+                                    system = system,
+                                ),
+                            )
+                            newExpanded = false
+                            refresh.value++
+                        }) { Text(tr("label.system." + system.name)) }
+                    }
+                }
+            }
         }
 
         if (recallMessage.isNotBlank()) {
@@ -147,6 +166,7 @@ fun LabelPanel(state: AppState, refresh: MutableState<Int>) {
 
 private fun labelHeaders(): List<String> = listOf(
     tr("label.name"),
+    tr("label.system"),
     tr("label.size"),
     tr("label.elements"),
     tr("common.actions"),
@@ -178,11 +198,18 @@ private fun LabelTableRow(
                 overflow = TextOverflow.Ellipsis,
             )
             1 -> Text(
+                tr("label.system." + template.system.name),
+                Modifier.cellPadding(),
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            2 -> Text(
                 "${template.widthMm} × ${template.heightMm} mm",
                 Modifier.cellPadding(),
                 fontSize = 12.sp,
             )
-            2 -> Text(template.elements.size.toString(), Modifier.cellPadding(), fontSize = 12.sp)
+            3 -> Text(template.elements.size.toString(), Modifier.cellPadding(), fontSize = 12.sp)
             else -> Row(Modifier.cellPadding(), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onEdit) { Text(tr("label.edit"), fontSize = 12.sp) }
                 TextButton(onClick = onDelete) {

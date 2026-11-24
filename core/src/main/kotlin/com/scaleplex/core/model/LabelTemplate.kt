@@ -1,5 +1,7 @@
 package com.scaleplex.core.model
 
+import java.util.UUID
+
 /**
  * Visual label template. Stored as JSON in the DB and exportable/importable.
  * The editor renders elements onto a millimeter canvas; the DIGI driver maps
@@ -13,6 +15,8 @@ data class LabelTemplate(
     val heightMm: Int = 30,
     val elements: List<LabelElement> = emptyList(),
     val note: String = "",
+    /** 标签体系：通用 / 托利多 VisEdit / bLabel / SmartLabel。 */
+    val system: LabelSystem = LabelSystem.GENERIC,
 )
 
 /**
@@ -77,9 +81,25 @@ enum class LabelElementKind {
 
     /** 外框（矩形框线，无文本）。 */
     FRAME,
+
+    /** 第二品名（托利多 VisEdit/bLabel/SmartLabel）。 */
+    SECOND_NAME,
+
+    /** 广告用语。 */
+    ADVERTISEMENT,
+
+    /** 固定重量。 */
+    FIXED_WEIGHT,
+
+    /** 皮重。 */
+    TARE_WEIGHT,
+
+    /** 追溯码。 */
+    TRACE_CODE,
 }
 
 data class LabelElement(
+    val id: String = UUID.randomUUID().toString(),
     val kind: LabelElementKind,
     val xMm: Float = 0f,
     val yMm: Float = 0f,

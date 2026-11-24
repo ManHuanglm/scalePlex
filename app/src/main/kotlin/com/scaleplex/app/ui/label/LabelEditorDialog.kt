@@ -41,65 +41,36 @@ import com.scaleplex.core.i18n.tr
 import com.scaleplex.core.model.BatchResult
 import com.scaleplex.core.model.LabelElement
 import com.scaleplex.core.model.LabelElementKind
+import com.scaleplex.core.model.LabelSystem
 import com.scaleplex.core.model.LabelTemplate
 import com.scaleplex.core.model.LabelTemplateJson
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.swing.JFileChooser
 
-/** 商品数据字段（对齐 DIGI Label Format 2005 左侧 PLU字段 面板）。 */
-private val PLU_FIELD_KINDS = listOf(
-    LabelElementKind.PLU_NO,
-    LabelElementKind.TOTAL_PRICE,
-    LabelElementKind.UNIT_PRICE,
-    LabelElementKind.WEIGHT,
-    LabelElementKind.QUANTITY,
-    LabelElementKind.QUANTITY_SYMBOL,
-    LabelElementKind.PLU_NAME,
-    LabelElementKind.BARCODE,
-    LabelElementKind.SHOP_NAME,
-    LabelElementKind.MAIN_GROUP,
-    LabelElementKind.INGREDIENT,
-    LabelElementKind.SPECIAL_MSG,
-    LabelElementKind.TAXED_PRICE,
-    LabelElementKind.TAX,
-)
-
-/** 图形元素（文本/日期时间/二维码/外框/图像）。 */
-private val SHAPE_KINDS = listOf(
-    LabelElementKind.TEXT,
-    LabelElementKind.DATE,
-    LabelElementKind.QRCODE,
-    LabelElementKind.FRAME,
-    LabelElementKind.LOGO,
-)
-
 private val ROTATION_OPTIONS = listOf(0, 90, 180, 270)
-
-/** 常用标签纸张预设（mm）。 */
-private val SIZE_PRESETS: List<Pair<String, Pair<Int, Int>>> = listOf(
-    "40×30" to Pair(40, 30),
-    "50×30" to Pair(50, 30),
-    "58×40" to Pair(58, 40),
-    "60×40" to Pair(60, 40),
-    "80×50" to Pair(80, 50),
-)
 
 /** 属性面板可选字体（秤端字库映射待联调校准）。 */
 private val FONT_OPTIONS = listOf("宋体", "黑体", "楷体", "微软雅黑", "Arial")
 
-/** 元素添加时的默认几何尺寸（毫米）与占位文本。 */
-private fun defaultElement(kind: LabelElementKind, index: Int): LabelElement = LabelElement(
-    kind = kind,
-    xMm = 4f,
-    yMm = 4f + (index % 6) * 5f,
-    widthMm = if (kind == LabelElementKind.FRAME) 30f else 24f,
-    heightMm = if (kind == LabelElementKind.FRAME) 20f else 6f,
-    text = when (kind) {
-        LabelElementKind.BARCODE -> "69012345"
-        else -> ""
-    },
-)
+/** 元素添加时的默认几何尺寸（毫米）与占位文本；按纸张高度自动换列，避免元素落到纸外。 */
+private fun defaultElement(kind: LabelElementKind, template: LabelTemplate): LabelElement {
+    val elementWidth = if (kind == LabelElementKind.FRAME) 30f else 24f
+    val elementHeight = if (kind == LabelElementKind.FRAME) 20f else 6f
+    val rowsPerColumn = ((template.heightMm - 8) / 5).coerceAtLeast(1)
+    val index = template.elements.size
+    return LabelElement(
+        kind = kind,
+        xMm = 4f + (index / rowsPerColumn) * 28f,
+        yMm = 4f + (index % rowsPerColumn) * 5f,
+        widthMm = elementWidth.coerceAtMost((template.widthMm - 8).coerceAtLeast(8).toFloat()),
+        heightMm = elementHeight.coerceAtMost((template.heightMm - 8).coerceAtLeast(4).toFloat()),
+        text = when (kind) {
+            LabelElementKind.BARCODE -> "69012345"
+            else -> ""
+        },
+    )
+}
 
 /**
  * 标签模板可视化编辑器：左侧元素面板、中间毫米画布（网格+方向键微调）、右侧属性面板。
@@ -137,17 +108,38 @@ fun LabelEditorDialog(
                         value = template.name, onValueChange = { template = template.copy(name = it) },
                         label = { Text(tr("label.name")) }, modifier = Modifier.width(150.dp),
                     )
-                    // 预设纸张尺寸
+                    // 标签体系（通用 / 托利多 VisEdit / bLabel / SmartLabel）
+                    var systemExpanded by remember { mutableStateOf(false) }
+                    OutlinedButton(onClick = { systemExpanded = true }) {
+                        Text(tr("label.system." + template.system.name) + " ▾")
+                    }
+                    DropdownMenu(systemExpanded, { systemExpanded = false }) {
+                        LabelSystem.entries.forEach { system ->
+                            DropdownMenuItem(onClick = {
+                                // 当前尺寸仍是原体系默认尺寸时，切换体系一并套用新体系默认纸张
+                                val old = template.system
+                                val keepSize = template.widthMm != old.defaultWidthMm ||
+                                    template.heightMm != old.defaultHeightMm
+                                template = template.copy(
+                                    system = system,
+                                    widthMm = if (keepSize) template.widthMm else system.defaultWidthMm,
+                                    heightMm = if (keepSize) template.heightMm else system.defaultHeightMm,
+                                )
+                                systemExpanded = false
+                            }) { Text(tr("label.system." + system.name)) }
+                        }
+                    }
+                    // 预设纸张尺寸（按标签体系给出常用规格）
                     var presetExpanded by remember { mutableStateOf(false) }
                     OutlinedButton(onClick = { presetExpanded = true }) {
                         Text("${template.widthMm}×${template.heightMm} ▾")
                     }
                     DropdownMenu(presetExpanded, { presetExpanded = false }) {
-                        SIZE_PRESETS.forEach { (label, size) ->
+                        template.system.sizePresets.forEach { size ->
                             DropdownMenuItem(onClick = {
                                 template = template.copy(widthMm = size.first, heightMm = size.second)
                                 presetExpanded = false
-                            }) { Text(label) }
+                            }) { Text("${size.first}×${size.second}") }
                         }
                     }
                     OutlinedTextField(
@@ -185,7 +177,7 @@ fun LabelEditorDialog(
                     OutlinedButton(onClick = {
                         importJson()?.let { imported -> template = imported; selected = null }
                     }) { Text(tr("label.importJson")) }
-                    Button(onClick = {
+                    Button(enabled = !template.system.isMettler, onClick = {
                         scope.launch {
                             batchResults = state.scaleService.downloadLabelToDevices(
                                 state.scaleService.devices().filter { it.enabled }, template,
@@ -200,8 +192,9 @@ fun LabelEditorDialog(
                 // ---- 三栏主体 ----
                 Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PaletteColumn(
+                        system = template.system,
                         onAdd = { kind ->
-                            updateElements { it + defaultElement(kind, it.size) }
+                            updateElements { it + defaultElement(kind, template) }
                             selected = template.elements.size - 1
                         },
                     )
@@ -274,7 +267,11 @@ fun LabelEditorDialog(
                     )
                 }
 
-                Text(tr("label.selectHint"), fontSize = 11.sp, color = Color(0xFF808080))
+                Text(
+                    if (template.system.isMettler) tr("label.mtHint") else tr("label.selectHint"),
+                    fontSize = 11.sp,
+                    color = Color(0xFF808080),
+                )
             }
         }
     }
@@ -287,7 +284,11 @@ fun LabelEditorDialog(
         ) {
             Surface(modifier = Modifier.width(640.dp).height(540.dp)) {
                 Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("${template.name} · ${template.widthMm}×${template.heightMm} mm", fontSize = 14.sp)
+                    Text(
+                        "${template.name} · ${tr("label.system." + template.system.name)} · " +
+                            "${template.widthMm}×${template.heightMm} mm",
+                        fontSize = 14.sp,
+                    )
                     LabelCanvas(
                         template = template,
                         selectedIndex = null,
@@ -310,17 +311,17 @@ fun LabelEditorDialog(
 }
 
 @Composable
-private fun PaletteColumn(onAdd: (LabelElementKind) -> Unit) {
+private fun PaletteColumn(system: LabelSystem, onAdd: (LabelElementKind) -> Unit) {
     Column(modifier = Modifier.width(150.dp).fillMaxHeight().verticalScroll(rememberScrollState())) {
         Text(tr("label.pluFields"), fontSize = 13.sp, color = Color(0xFF1E88E5))
-        PLU_FIELD_KINDS.forEach { kind ->
+        system.fieldKinds.forEach { kind ->
             Button(onClick = { onAdd(kind) }, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                 Text(tr("label.kind." + kind.name))
             }
         }
         Divider(Modifier.padding(vertical = 6.dp))
         Text(tr("label.shapes"), fontSize = 13.sp, color = Color(0xFF1E88E5))
-        SHAPE_KINDS.forEach { kind ->
+        system.shapeKinds.forEach { kind ->
             Button(onClick = { onAdd(kind) }, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                 Text(tr("label.kind." + kind.name))
             }
@@ -344,6 +345,7 @@ private fun PropertyPanel(
     Column(modifier = Modifier.width(240.dp).fillMaxHeight().verticalScroll(rememberScrollState())) {
         // ---- 标签信息（对齐 Label Format 2005 右侧属性区：mm 与 Dot 双单位，8 dots/mm）----
         Text(tr("label.info"), fontSize = 13.sp, color = Color(0xFF1E88E5))
+        InfoRow(tr("label.system"), tr("label.system." + template.system.name))
         InfoRow(tr("label.formatNo"), if (template.id > 0) template.id.toString() else "-")
         InfoRow(tr("label.width"), "${template.widthMm} (mm) · ${template.widthMm * 8} (Dot)")
         InfoRow(tr("label.height"), "${template.heightMm} (mm) · ${template.heightMm * 8} (Dot)")

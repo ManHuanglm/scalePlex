@@ -1,5 +1,7 @@
 package com.scaleplex.core.model
 
+import java.util.UUID
+
 /**
  * JSON serialization for [LabelElement] lists — the shape used both by the DB
  * `label_template.elements_json` column and by label-template import/export files.
@@ -35,7 +37,7 @@ object LabelTemplateJson {
     /** 序列化元素列表（DB 存储与导入导出文件共用格式）。 */
     fun writeElements(elements: List<LabelElement>): String =
         "[" + elements.joinToString(",") { e ->
-            "{\"kind\":\"${e.kind.name}\",\"x\":${e.xMm},\"y\":${e.yMm},\"w\":${e.widthMm},\"h\":${e.heightMm}," +
+            "{\"id\":\"${e.id}\",\"kind\":\"${e.kind.name}\",\"x\":${e.xMm},\"y\":${e.yMm},\"w\":${e.widthMm},\"h\":${e.heightMm}," +
                 "\"text\":\"${esc(e.text)}\",\"font\":\"${esc(e.fontName)}\",\"size\":${e.fontSizePt}," +
                 "\"align\":${e.align},\"rot\":${e.rotation}}"
         } + "]"
@@ -46,12 +48,14 @@ object LabelTemplateJson {
         return Regex("\\{[^}]*\\}").findAll(json).map { obj ->
             val kind = Regex("\"kind\"\\s*:\\s*\"(\\w+)\"").find(obj.value)?.groupValues?.get(1)
                 ?.let { runCatching { LabelElementKind.valueOf(it) }.getOrNull() } ?: LabelElementKind.TEXT
+            val id = Regex("\"id\"\\s*:\\s*\"([^\"]*)\"").find(obj.value)?.groupValues?.get(1) ?: UUID.randomUUID().toString()
             fun num(key: String) = Regex("\"$key\"\\s*:\\s*(-?[\\d.]+)").find(obj.value)?.groupValues?.get(1)?.toFloatOrNull() ?: 0f
             val text = Regex("\"text\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").find(obj.value)
                 ?.groupValues?.get(1)?.let(::unesc) ?: ""
             val font = Regex("\"font\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").find(obj.value)
                 ?.groupValues?.get(1)?.let(::unesc) ?: "SimSun"
             LabelElement(
+                id = id,
                 kind = kind, xMm = num("x"), yMm = num("y"), widthMm = num("w"), heightMm = num("h"),
                 text = text, fontName = font, fontSizePt = num("size").toInt(),
                 align = num("align").toInt(), rotation = num("rot").toInt(),
@@ -65,6 +69,7 @@ object LabelTemplateJson {
         append("\"width\":").append(template.widthMm).append(",")
         append("\"height\":").append(template.heightMm).append(",")
         append("\"note\":\"").append(esc(template.note)).append("\",")
+        append("\"system\":\"").append(template.system.name).append("\",")
         append("\"elements\":").append(writeElements(template.elements))
         append("}")
     }
@@ -78,9 +83,11 @@ object LabelTemplateJson {
         val note = Regex("\"note\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").find(json)
             ?.groupValues?.get(1)?.let(::unesc) ?: ""
         val elementsJson = Regex("\"elements\"\\s*:\\s*(\\[.*\\])").find(json)?.groupValues?.get(1) ?: "[]"
+        val system = Regex("\"system\"\\s*:\\s*\"(\\w+)\"").find(json)?.groupValues?.get(1)
+            ?.let { LabelSystem.fromId(it) } ?: LabelSystem.GENERIC
         return LabelTemplate(
             id = 0, name = name, widthMm = width, heightMm = height,
-            elements = readElements(elementsJson), note = note,
+            elements = readElements(elementsJson), note = note, system = system,
         )
     }
 }

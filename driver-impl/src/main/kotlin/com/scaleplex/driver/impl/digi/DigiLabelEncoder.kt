@@ -46,7 +46,14 @@ object DigiLabelEncoder {
         LabelElementKind.TAXED_PRICE -> 0x10
         LabelElementKind.TAX -> 0x11
         LabelElementKind.FRAME -> 0x12
-        LabelElementKind.LOGO -> null
+        // 托利多体系专有字段（第二品名/广告用语/固定重量/皮重/追溯码），DIGI 无对应数据域
+        LabelElementKind.SECOND_NAME,
+        LabelElementKind.ADVERTISEMENT,
+        LabelElementKind.FIXED_WEIGHT,
+        LabelElementKind.TARE_WEIGHT,
+        LabelElementKind.TRACE_CODE,
+        LabelElementKind.LOGO,
+        -> null
     }
 
     /** 模板中可下发的元素（过滤 LOGO 等不支持类型）。 */

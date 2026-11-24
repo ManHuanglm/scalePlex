@@ -40,8 +40,9 @@ class Database(private val dbFile: File) : AutoCloseable {
             }
             if (userVersion < 2) SchemaV2.apply(c)
             if (userVersion < 3) SchemaV3.apply(c)
+            if (userVersion < 4) SchemaV4.apply(c)
             SchemaV1.seedDefaults(c)
-            c.createStatement().use { it.executeUpdate("PRAGMA user_version = 3") }
+            c.createStatement().use { it.executeUpdate("PRAGMA user_version = 4") }
             c.commit()
         } catch (t: Throwable) {
             c.rollback()
