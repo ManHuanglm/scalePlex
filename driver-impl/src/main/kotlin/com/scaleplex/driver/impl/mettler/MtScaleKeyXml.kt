@@ -123,14 +123,30 @@ object MtScaleKeyXml {
             appendLine("    </Descriptions>")
             appendLine("    <ItemPrices>")
             appendLine(
-                """      <ItemPrice Index="0" UnitOfMeasureCode="$uom" UnitDes="" PriceOverrideFlag="true" """ +
-                    """DiscountFlag="false" Quantity="0" Currency="$currency">""" +
+                """      <ItemPrice Index="0" UnitOfMeasureCode="$uom" UnitDes="" PriceOverrideFlag="${plu.allowMarkdown}" """ +
+                    """DiscountFlag="${plu.allowDiscount}" Quantity="0" Currency="$currency">""" +
                     "${Numbers.minorToDisplay(plu.unitPrice, priceDecimals)}</ItemPrice>",
             )
             appendLine("    </ItemPrices>")
-            if (plu.effectiveShelfLifeDays > 0) {
+            // 日期：包装日期（可选）+ 保质期（BestBefore）
+            val dateLines = buildList {
+                if (plu.packedDate > 0 || plu.packedDatePrintFlag) {
+                    val unit = if (plu.packedDateUnit == 1) "Months" else "Days"
+                    add(
+                        """      <Date Type="PackedDate" PrintFlag="${plu.printPackedDate}" Unit="$unit">""" +
+                            "${plu.packedDate}</Date>",
+                    )
+                }
+                if (plu.effectiveShelfLifeDays > 0) {
+                    add(
+                        """      <Date Type="BestBefore" PrintFlag="True" Unit="Days">""" +
+                            "${plu.effectiveShelfLifeDays}</Date>",
+                    )
+                }
+            }
+            if (dateLines.isNotEmpty()) {
                 appendLine("    <Dates>")
-                appendLine("""      <Date Type="BestBefore" PrintFlag="True" Unit="Days">${plu.effectiveShelfLifeDays}</Date>""")
+                dateLines.forEach { appendLine(it) }
                 appendLine("    </Dates>")
             }
             appendLine("    <LabelFormats>")
@@ -231,6 +247,10 @@ object MtScaleKeyXml {
             val minor = BigDecimal(priceText).movePointRight(2).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact()
             val labelFormat = Regex("<LabelFormatID[^>]*>(\\d+)</LabelFormatID>").find(block)?.groupValues?.get(1)?.toIntOrNull() ?: 1
             val bestBefore = Regex("<Date[^>]*Type=\"BestBefore\"[^>]*>(\\d+)</Date>").find(block)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            val packedDate = Regex("<Date[^>]*Type=\"PackedDate\"[^>]*>(\\d+)</Date>").find(block)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            val priceTag = Regex("<ItemPrice[^>]*>").find(block)?.value.orEmpty()
+            val allowMarkdown = priceTag.contains("PriceOverrideFlag=\"True\"", ignoreCase = true)
+            val allowDiscount = priceTag.contains("DiscountFlag=\"True\"", ignoreCase = true)
             items += PluItem(
                 pluNo = pluNo,
                 name = name,
@@ -239,6 +259,9 @@ object MtScaleKeyXml {
                 unitPrice = minor,
                 eanCode = barcode?.toString() ?: "",
                 usedByDate = bestBefore,
+                packedDate = packedDate,
+                allowMarkdown = allowMarkdown,
+                allowDiscount = allowDiscount,
                 label1Format = labelFormat,
             )
         }

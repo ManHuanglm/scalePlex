@@ -146,6 +146,50 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                     minLines = 3, maxLines = 5,
                 )
 
+                // ---- 托利多属性（对齐 Scale Manager 商品维护列，本地维护/下发映射待联调）----
+                Text(tr("plu.mt.section"), Modifier.padding(top = 8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CheckField(tr("plu.mt.allowMarkdown"), plu.allowMarkdown) { plu = plu.copy(allowMarkdown = it) }
+                    CheckField(tr("plu.mt.allowDiscount"), plu.allowDiscount) { plu = plu.copy(allowDiscount = it) }
+                    CheckField(tr("plu.mt.tarePrice"), plu.tarePriceFlag) { plu = plu.copy(tarePriceFlag = it) }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CheckField(tr("plu.mt.packedPrint"), plu.packedDatePrintFlag) {
+                        plu = plu.copy(packedDatePrintFlag = it)
+                    }
+                    Text(tr("plu.mt.packedUnit"), Modifier.width(90.dp))
+                    var packedUnitExpanded by remember { mutableStateOf(false) }
+                    OutlinedTextField(
+                        value = if (plu.packedDateUnit == 1) tr("plu.mt.unit.month") else tr("plu.mt.unit.day"),
+                        onValueChange = {}, readOnly = true, modifier = Modifier.width(80.dp),
+                        trailingIcon = { TextButton(onClick = { packedUnitExpanded = true }) { Text("▾") } },
+                    )
+                    DropdownMenu(packedUnitExpanded, { packedUnitExpanded = false }) {
+                        DropdownMenuItem(onClick = {
+                            plu = plu.copy(packedDateUnit = 0)
+                            packedUnitExpanded = false
+                        }) { Text(tr("plu.mt.unit.day")) }
+                        DropdownMenuItem(onClick = {
+                            plu = plu.copy(packedDateUnit = 1)
+                            packedUnitExpanded = false
+                        }) { Text(tr("plu.mt.unit.month")) }
+                    }
+                    CheckField(tr("plu.mt.printPacked"), plu.printPackedDate) {
+                        plu = plu.copy(printPackedDate = it)
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    CheckField(tr("plu.mt.shelfPrint"), plu.shelfLifePrintFlag) {
+                        plu = plu.copy(shelfLifePrintFlag = it)
+                    }
+                    CheckField(tr("plu.mt.printShelf"), plu.printShelfLifeDate) {
+                        plu = plu.copy(printShelfLifeDate = it)
+                    }
+                    Field(tr("plu.mt.extraText"), plu.extraTextNo.toString(), Modifier.weight(1f)) { s ->
+                        s.toIntOrNull()?.let { plu = plu.copy(extraTextNo = it.coerceAtLeast(0)) }
+                    }
+                }
+
                 // ---- 高级选项 ----
                 TextButton(onClick = { showAdvanced = !showAdvanced }, modifier = Modifier.align(Alignment.Start)) {
                     Text(if (showAdvanced) "▾ " + tr("plu.advanced") else "▸ " + tr("plu.advanced"))
@@ -226,6 +270,15 @@ private fun Field(label: String, value: String, modifier: Modifier = Modifier, o
         value = value, onValueChange = onChange, label = { Text(label) },
         modifier = modifier.padding(vertical = 4.dp),
     )
+}
+
+/** 是/否勾选项（托利多属性）。 */
+@Composable
+private fun CheckField(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(checked = checked, onCheckedChange = onChange)
+        Text(label, fontSize = 12.sp)
+    }
 }
 
 /** TOP2000 的成分/特殊信息为多行文本，换行即一条秤端文本行（默认字库 23）。 */

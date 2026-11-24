@@ -62,6 +62,7 @@ import com.scaleplex.app.ui.table.rememberTableState
 import com.scaleplex.core.i18n.tr
 import com.scaleplex.core.model.BatchResult
 import com.scaleplex.core.model.PluItem
+import com.scaleplex.core.model.PluUnit
 import com.scaleplex.core.model.ShelfLifeUnit
 import com.scaleplex.core.util.Numbers
 import com.scaleplex.db.dao.PluDao
@@ -108,8 +109,7 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
     val density = LocalDensity.current
 
     /** 提交单格编辑：解析失败或保存失败时保留列表原值并提示原因。 */
-    fun commitInlineEdit(plu: PluItem, column: Int, input: String) {
-        val updated = applyCellEdit(plu, column, input, state.config.priceDecimals)
+    fun saveInline(updated: PluItem?) {
         if (updated == null) {
             inlineMessage = tr("plu.inlineInvalid")
         } else {
@@ -121,10 +121,21 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
         inlineEdit = null
     }
 
+    fun commitInlineEdit(plu: PluItem, column: Int, input: String) {
+        saveInline(applyCellEdit(plu, column, input, state.config.priceDecimals))
+    }
+
+    /** 是/否类单元格双击直接切换并保存。 */
+    fun commitCellToggle(plu: PluItem, column: Int) {
+        saveInline(toggleCell(plu, column))
+    }
+
     val table = rememberTableState(
         listOf(
             36.dp, 60.dp, 60.dp, 160.dp, 70.dp, 70.dp, 80.dp, 70.dp, 65.dp, 65.dp,
             90.dp, 110.dp, 100.dp, 50.dp, 60.dp,
+            // 托利多商品维护列（对齐 Scale Manager 商品维护）
+            70.dp, 75.dp, 75.dp, 75.dp, 80.dp, 90.dp, 90.dp, 90.dp, 90.dp, 95.dp,
         ),
     )
 
@@ -342,15 +353,19 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
                                         }
                                         val cell = column - 1
                                         if (cell >= 0) {
-                                            if (cell in EDITABLE_COLUMNS) {
-                                                inlineEdit = InlineEdit(
-                                                    pluNo = p.pluNo,
-                                                    column = cell,
-                                                    value = cellText(cell, p, state, categoryNames),
-                                                )
-                                            } else {
-                                                editing = p
-                                                showEditor = true
+                                            when {
+                                                cell in TOGGLE_COLUMNS -> commitCellToggle(p, cell)
+                                                cell in EDITABLE_COLUMNS -> {
+                                                    inlineEdit = InlineEdit(
+                                                        pluNo = p.pluNo,
+                                                        column = cell,
+                                                        value = cellText(cell, p, state, categoryNames),
+                                                    )
+                                                }
+                                                else -> {
+                                                    editing = p
+                                                    showEditor = true
+                                                }
                                             }
                                         }
                                     },
@@ -450,10 +465,24 @@ private fun pluHeaders(): List<String> = listOf(
     tr("plu.field.updated"),     // 修改时间
     tr("plu.hotkey"),            // 热键
     tr("plu.field.groupNo"),     // 类别编号
+    // 托利多商品维护列（对齐 Scale Manager 商品维护）
+    tr("plu.mt.weightMode"),
+    tr("plu.mt.tarePrice"),
+    tr("plu.mt.allowMarkdown"),
+    tr("plu.mt.allowDiscount"),
+    tr("plu.mt.extraText"),
+    tr("plu.mt.packedPrint"),
+    tr("plu.mt.packedUnit"),
+    tr("plu.mt.printPacked"),
+    tr("plu.mt.shelfPrint"),
+    tr("plu.mt.printShelf"),
 )
 
 /** 可双击直接编辑的列（0 起，首列勾选框除外）。 */
-private val EDITABLE_COLUMNS = setOf(2, 3, 4, 5, 6, 7, 8, 10, 13, 14)
+private val EDITABLE_COLUMNS = setOf(2, 3, 4, 5, 6, 7, 8, 10, 13, 14, 19)
+
+/** 是/否类列：双击直接切换并保存。 */
+private val TOGGLE_COLUMNS = setOf(15, 16, 17, 18, 20, 21, 22, 23, 24)
 
 /** 正在内联编辑的单格。 */
 private data class InlineEdit(val pluNo: Int, val column: Int, val value: String)
@@ -502,8 +531,21 @@ private fun cellText(
     11 -> summarize(p.specialMsgLines)
     12 -> SimpleDateFormat("yy-MM-dd HH:mm", Locale.ROOT).format(Date(p.updatedAt))
     13 -> p.hotKey.takeIf { it > 0 }?.toString() ?: "-"
+    15 -> if (p.weightFlag == 1) tr("plu.weight.count") else tr("plu.weight.weigh")
+    16 -> yesNo(p.tarePriceFlag)
+    17 -> yesNo(p.allowMarkdown)
+    18 -> yesNo(p.allowDiscount)
+    19 -> p.extraTextNo.toString()
+    20 -> yesNo(p.packedDatePrintFlag)
+    21 -> if (p.packedDateUnit == 1) tr("plu.mt.unit.month") else tr("plu.mt.unit.day")
+    22 -> yesNo(p.printPackedDate)
+    23 -> yesNo(p.shelfLifePrintFlag)
+    24 -> yesNo(p.printShelfLifeDate)
     else -> p.mainGroup.toString()
 }
+
+/** 是/否显示。 */
+private fun yesNo(value: Boolean): String = tr(if (value) "common.yes" else "common.no")
 
 /** 将单格输入写回 PLU；返回 null 表示输入格式不合法。 */
 private fun applyCellEdit(p: PluItem, column: Int, input: String, priceDecimals: Int): PluItem? {
@@ -523,8 +565,26 @@ private fun applyCellEdit(p: PluItem, column: Int, input: String, priceDecimals:
         10 -> p.copy(nameEn = text)
         13 -> text.toIntOrNull()?.let { p.copy(hotKey = it.coerceIn(0, 999)) }
         14 -> text.toIntOrNull()?.let { p.copy(mainGroup = it) }
+        19 -> text.toIntOrNull()?.let { p.copy(extraTextNo = it.coerceAtLeast(0)) }
         else -> null
     }
+}
+
+/** 双击切换是/否类单元格；返回 null 表示该列不支持切换。 */
+private fun toggleCell(p: PluItem, column: Int): PluItem? = when (column) {
+    15 -> p.copy(
+        weightFlag = if (p.weightFlag == 1) 0 else 1,
+        unit = if (p.weightFlag == 1) PluUnit.KG.id else PluUnit.PCS.id,
+    )
+    16 -> p.copy(tarePriceFlag = !p.tarePriceFlag)
+    17 -> p.copy(allowMarkdown = !p.allowMarkdown)
+    18 -> p.copy(allowDiscount = !p.allowDiscount)
+    20 -> p.copy(packedDatePrintFlag = !p.packedDatePrintFlag)
+    21 -> p.copy(packedDateUnit = if (p.packedDateUnit == 1) 0 else 1)
+    22 -> p.copy(printPackedDate = !p.printPackedDate)
+    23 -> p.copy(shelfLifePrintFlag = !p.shelfLifePrintFlag)
+    24 -> p.copy(printShelfLifeDate = !p.printShelfLifeDate)
+    else -> null
 }
 
 /** 单元格内联编辑框：Enter 提交、Esc 取消、失焦提交。 */

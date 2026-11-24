@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.scaleplex.communication.CommEventBus
 import com.scaleplex.core.model.DeviceRuntime
+import com.scaleplex.core.model.DeviceStatus
 import com.scaleplex.core.model.ScaleConfig
 import com.scaleplex.core.model.ScaleDevice
 import com.scaleplex.db.Database
@@ -70,7 +71,9 @@ class AppState(
                 coroutineScope {
                     devices.forEach { dev ->
                         launch {
-                            deviceRuntimes[dev.id] = scaleService.probeStatus(dev)
+                            // 单台秤探测失败（离线/未注册驱动）不应中断整轮心跳
+                            deviceRuntimes[dev.id] = runCatching { scaleService.probeStatus(dev) }
+                                .getOrElse { DeviceRuntime(dev, DeviceStatus.OFFLINE) }
                         }
                     }
                 }
@@ -107,7 +110,8 @@ class AppState(
             coroutineScope {
                 devices.forEach { dev ->
                     launch {
-                        deviceRuntimes[dev.id] = scaleService.probeStatus(dev)
+                        deviceRuntimes[dev.id] = runCatching { scaleService.probeStatus(dev) }
+                            .getOrElse { DeviceRuntime(dev, DeviceStatus.OFFLINE) }
                     }
                 }
             }

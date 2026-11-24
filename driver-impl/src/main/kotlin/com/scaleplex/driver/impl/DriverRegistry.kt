@@ -2,8 +2,12 @@ package com.scaleplex.driver.impl
 
 import com.scaleplex.core.model.ScaleBrand
 import com.scaleplex.driver.api.ScaleDriverFactory
+import com.scaleplex.driver.impl.aclas.AclasDriver
 import com.scaleplex.driver.impl.dahua.DahuaDriver
 import com.scaleplex.driver.impl.digi.DigiSmDriver
+import com.scaleplex.driver.impl.hihong.HiHongUdpDriver
+import com.scaleplex.driver.impl.mettler.MettlerToledoDriver
+import com.scaleplex.driver.impl.yousheng.YouShengDriver
 
 /**
  * Registers all concrete drivers with [ScaleDriverFactory]. Call [install] once at
@@ -20,6 +24,10 @@ object DriverRegistry {
             if (installed) return
             ScaleDriverFactory.register(ScaleBrand.DIGI) { device -> DigiSmDriver(device) }
             ScaleDriverFactory.register(ScaleBrand.DAHUA) { device -> DahuaDriver(device) }
+            ScaleDriverFactory.register(ScaleBrand.YOUSHENG) { device -> YouShengDriver(device) }
+            ScaleDriverFactory.register(ScaleBrand.HIHONG) { device -> HiHongUdpDriver(device) }
+            ScaleDriverFactory.register(ScaleBrand.METTLER_TOLEDO) { device -> MettlerToledoDriver(device) }
+            ScaleDriverFactory.register(ScaleBrand.DINGTOP) { device -> AclasDriver(device) }
             installed = true
         }
     }

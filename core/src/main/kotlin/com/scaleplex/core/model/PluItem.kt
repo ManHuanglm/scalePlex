@@ -82,6 +82,24 @@ data class PluItem(
     val shelfLifeUnit: Int = ShelfLifeUnit.DAY.id,
     val sellByDate: Int = 0,
     val packedDate: Int = 0,
+    /** 托利多：允许折价（ItemPrice PriceOverrideFlag）。 */
+    val allowMarkdown: Boolean = false,
+    /** 托利多：允许折扣（ItemPrice DiscountFlag）。 */
+    val allowDiscount: Boolean = false,
+    /** 托利多：除皮价格标志（本地维护，秤端映射待校准）。 */
+    val tarePriceFlag: Boolean = false,
+    /** 托利多：附加文本号（Descriptions ExtraText 索引，待联调）。 */
+    val extraTextNo: Int = 0,
+    /** 托利多：包装日期打印标志（Dates PackedDate 启用）。 */
+    val packedDatePrintFlag: Boolean = false,
+    /** 托利多：包装日期单位（0=天 1=月，Date UnitOfOffset）。 */
+    val packedDateUnit: Int = 0,
+    /** 托利多：打印包装日期（Date PrintEnabled）。 */
+    val printPackedDate: Boolean = false,
+    /** 托利多：保质期日期打印标志（Dates BestBefore 启用）。 */
+    val shelfLifePrintFlag: Boolean = false,
+    /** 托利多：打印保质期日期（Date PrintEnabled）。 */
+    val printShelfLifeDate: Boolean = false,
     val label1Format: Int = 0,
     val label2Format: Int = 0,
     val placeNo: Int = 0,
