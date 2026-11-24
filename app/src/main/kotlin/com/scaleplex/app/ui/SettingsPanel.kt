@@ -198,6 +198,14 @@ fun SettingsPanel(state: AppState, refresh: MutableState<Int>) {
                         onChange = { cfg = cfg.copy(aclasToolsPath = it) },
                         selectDirectory = true,
                     )
+                    // 托利多三种标签编辑器（VisEdit / bLabel / SmartLabel）由 Scale Manager 安装目录提供
+                    ToolDirRow(
+                        label = tr("settings.mtLabelEditor"),
+                        value = cfg.mtScaleManagerPath,
+                        hint = tr("settings.mtLabelEditorHint"),
+                        onChange = { cfg = cfg.copy(mtScaleManagerPath = it) },
+                        selectDirectory = true,
+                    )
                 }
 
                 // ---- 数据备份与恢复 ----

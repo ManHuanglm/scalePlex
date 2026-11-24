@@ -165,15 +165,17 @@ class MettlerToledoDriver(
     override suspend fun readLabelFormats(): Result<List<LabelTemplate>> =
         Result.failure(
             UnsupportedOperationException(
-                "托利多标签格式回收需各型号专用编辑器（VisEdit/bLabel/Smartlabel）配合，暂未接入",
+                "托利多标签格式由专用编辑器维护（VisEdit/bLabel/SmartLabel），" +
+                    "请在设备列表点击「标签编辑」打开对应编辑器设计下发，暂不支持回收",
             ),
         )
 
     override suspend fun downloadLabelTemplate(template: LabelTemplate): Result<Unit> =
         Result.failure(
             UnsupportedOperationException(
-                "托利多标签格式由各型号专用编辑器维护（RL00=VisEdit, bCom/bPro=bLabel, bPlus/FreshBase=Smartlabel），" +
-                    "ScalePlex 通过 Item.LabelFormatID 引用秤内既有标签号，模板本体下发待后续版本",
+                "托利多标签格式由各型号专用编辑器维护（RL00=VisEdit，bCom/bPro=bLabel，" +
+                    "bPlus/FreshBase/bComS=SmartLabel），请在设备列表点击「标签编辑」设计并下发；" +
+                    "ScalePlex 通过 Item.LabelFormatID 引用秤内既有标签号",
             ),
         )
 

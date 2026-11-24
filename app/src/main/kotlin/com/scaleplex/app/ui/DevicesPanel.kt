@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scaleplex.app.AppState
+import com.scaleplex.app.MtLabelEditorLauncher
 import com.scaleplex.app.ui.table.ScrollableTable
 import com.scaleplex.app.ui.table.TableHeader
 import com.scaleplex.app.ui.table.TableRow
@@ -50,6 +51,7 @@ import com.scaleplex.core.i18n.tr
 import com.scaleplex.core.model.BatchResult
 import com.scaleplex.core.model.CommType
 import com.scaleplex.core.model.DeviceStatus
+import com.scaleplex.core.model.MtLabelEditor
 import com.scaleplex.core.model.ScaleBrand
 import com.scaleplex.core.model.ScaleDevice
 import com.scaleplex.core.model.ScaleGroup
@@ -71,12 +73,13 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
     var groupEditing by remember { mutableStateOf<ScaleGroup?>(null) }
     var showGroupEditor by remember { mutableStateOf(false) }
     var batchResults by remember { mutableStateOf<Map<Long, BatchResult>?>(null) }
+    var editorMessage by remember { mutableStateOf<String?>(null) }
     val checked = remember { mutableStateListOf<Long>() }
     val scope = rememberCoroutineScope()
 
     val online = devices.count { state.deviceRuntimes[it.id]?.status == DeviceStatus.ONLINE }
     val table = rememberTableState(
-        listOf(36.dp, 90.dp, 150.dp, 110.dp, 110.dp, 220.dp, 140.dp),
+        listOf(36.dp, 90.dp, 150.dp, 110.dp, 110.dp, 220.dp, 220.dp),
     )
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -203,6 +206,14 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
                         checked = checked.contains(d.id),
                         onCheck = { c -> if (c) checked.add(d.id) else checked.remove(d.id) },
                         onEdit = { editing = d; showEditor = true },
+                        onLabelEditor = {
+                            editorMessage = MtLabelEditorLauncher
+                                .launch(d.model, state.config.mtScaleManagerPath)
+                                .exceptionOrNull()
+                                ?.let { error ->
+                                    tr("mtEditor.launchFailed") + (error.message ?: error.javaClass.simpleName)
+                                }
+                        },
                         onDelete = {
                             scope.launch {
                                 state.scaleService.deleteDevice(d.id)
@@ -245,6 +256,16 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
     batchResults?.let {
         BatchResultDialog(state, it, onDismiss = { batchResults = null })
     }
+    editorMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = { editorMessage = null },
+            title = { Text(tr("device.labelEditor")) },
+            text = { Text(message, fontSize = 12.sp) },
+            confirmButton = {
+                Button(onClick = { editorMessage = null }) { Text(tr("common.ok")) }
+            },
+        )
+    }
 }
 
 /** 设备表格列标题。 */
@@ -266,6 +287,7 @@ private fun DeviceTableRow(
     checked: Boolean,
     onCheck: (Boolean) -> Unit,
     onEdit: () -> Unit,
+    onLabelEditor: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val (hoverSource, hovered) = rememberRowHover()
@@ -292,6 +314,12 @@ private fun DeviceTableRow(
             5 -> Text(deviceAddress(d), Modifier.cellPadding(), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             else -> Row(Modifier.cellPadding(), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = onEdit) { Text(tr("device.edit"), fontSize = 12.sp) }
+                // 托利多标签格式由专用编辑器维护：按机型启动 VisEdit / bLabel / SmartLabel
+                if (d.brand == ScaleBrand.METTLER_TOLEDO) {
+                    TextButton(onClick = onLabelEditor) {
+                        Text(tr("device.labelEditor"), fontSize = 12.sp)
+                    }
+                }
                 TextButton(onClick = onDelete) {
                     Text(tr("device.delete"), fontSize = 12.sp, color = UiColors.Error)
                 }
@@ -334,6 +362,7 @@ private fun DeviceEditorDialog(
     onSave: (ScaleDevice) -> Unit,
 ) {
     var dev by remember { mutableStateOf(initial) }
+    var editorError by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (initial.id == 0L) tr("device.add") else tr("device.edit")) },
@@ -389,6 +418,33 @@ private fun DeviceEditorDialog(
                                 }) { Text(model) }
                             }
                         }
+                    }
+                }
+
+                // 托利多：按当前型号显示应使用的标签编辑器，并可直接启动
+                if (dev.brand == ScaleBrand.METTLER_TOLEDO) {
+                    val editor = MtLabelEditor.fromModel(dev.model)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            tr("device.labelEditor") + "：" + editor.displayName,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f),
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = {
+                            editorError = MtLabelEditorLauncher
+                                .launch(dev.model, state.config.mtScaleManagerPath)
+                                .exceptionOrNull()
+                                ?.let { error ->
+                                    tr("mtEditor.launchFailed") + (error.message ?: error.javaClass.simpleName)
+                                }
+                        }) { Text(tr("common.open"), fontSize = 12.sp) }
+                    }
+                    editorError?.let { message ->
+                        Text(message, fontSize = 11.sp, color = UiColors.Error)
                     }
                 }
 

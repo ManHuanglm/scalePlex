@@ -69,4 +69,6 @@ data class ScaleConfig(
     val dahuaToolsPath: String = "",
     /** 顶尖 Aclas 工具目录（AclasSDK.dll 所在），顶尖驱动桥接调用。 */
     val aclasToolsPath: String = "",
+    /** 托利多标签编辑器目录（Scale Manager 安装根目录，含 VisEdit/bLabel/SmartLabel），空 = 自动探测。 */
+    val mtScaleManagerPath: String = "",
 )

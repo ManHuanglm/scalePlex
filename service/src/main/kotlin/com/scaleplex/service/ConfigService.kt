@@ -36,6 +36,7 @@ class ConfigService(db: Database) {
             digiToolsPath = g("digiToolsPath", ""),
             dahuaToolsPath = g("dahuaToolsPath", ""),
             aclasToolsPath = g("aclasToolsPath", ""),
+            mtScaleManagerPath = g("mtScaleManagerPath", ""),
         )
         // 启动时同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS / 大华 DhScalePluNet / 顶尖 AclasSDK）
         if (config.mtApiDllPath.isNotBlank()) {
@@ -72,6 +73,7 @@ class ConfigService(db: Database) {
         dao.put("digiToolsPath", cfg.digiToolsPath)
         dao.put("dahuaToolsPath", cfg.dahuaToolsPath)
         dao.put("aclasToolsPath", cfg.aclasToolsPath)
+        dao.put("mtScaleManagerPath", cfg.mtScaleManagerPath)
         // 同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS / 大华 DhScalePluNet / 顶尖 AclasSDK）
         if (cfg.mtApiDllPath.isNotBlank()) {
             System.setProperty("scaleplex.mt.dll", cfg.mtApiDllPath)
