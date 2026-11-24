@@ -295,6 +295,11 @@ private fun displayText(element: LabelElement): String = when (element.kind) {
     LabelElementKind.TEMPERATURE -> "4°C"
     LabelElementKind.SCALE_NO -> "001"
     LabelElementKind.SELLER -> "01"
+    LabelElementKind.AVERAGE_PRICE -> "AVG ¥"
+    LabelElementKind.AVERAGE_WEIGHT -> "AVG kg"
+    LabelElementKind.BONUS_POINT -> "100 PTS"
+    LabelElementKind.ORIGIN -> "CN"
+    LabelElementKind.MULTI_BARCODE -> "||||| ×2"
     LabelElementKind.MAIN_GROUP -> "997"
     LabelElementKind.DEPARTMENT -> "01"
     LabelElementKind.DATE -> element.text.ifBlank { "2026-01-01" }

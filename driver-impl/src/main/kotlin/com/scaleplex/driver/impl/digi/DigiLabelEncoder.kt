@@ -70,6 +70,11 @@ object DigiLabelEncoder {
         LabelElementKind.DISCOUNT,
         LabelElementKind.SCALE_NO,
         LabelElementKind.SELLER,
+        LabelElementKind.MULTI_BARCODE,
+        LabelElementKind.AVERAGE_PRICE,
+        LabelElementKind.AVERAGE_WEIGHT,
+        LabelElementKind.BONUS_POINT,
+        LabelElementKind.ORIGIN,
         LabelElementKind.LOGO,
         -> null
     }

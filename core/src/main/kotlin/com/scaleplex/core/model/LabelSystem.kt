@@ -1,11 +1,29 @@
 package com.scaleplex.core.model
 
 /**
- * 标签体系：通用标签 + 寺冈 Label Format 2005 + 托利多三种官方标签编辑器体系 + 顶尖 Aclas 标签编辑器。
+ * 标签字段面板项：同一元素类型可对应多个槽位
+ * （如寺冈 SM-120 Free Format 的 TEXT 2/5/6/8/9/10/11/15）。
+ */
+data class LabelFieldEntry(
+    val kind: LabelElementKind,
+    /** i18n key。 */
+    val labelKey: String,
+    /** 添加元素时的默认占位文本。 */
+    val defaultText: String = "",
+) {
+    companion object {
+        fun of(kind: LabelElementKind, defaultText: String = ""): LabelFieldEntry =
+            LabelFieldEntry(kind, "label.kind." + kind.name, defaultText)
+    }
+}
+
+/**
+ * 标签体系：通用标签 + 寺冈两种编辑器 + 托利多三种官方标签编辑器体系 + 顶尖 Aclas 标签编辑器。
  *
  * 各体系的字段面板与常用纸张尺寸对齐对应编辑器：
  * - [GENERIC]：原有通用字段（寺冈 Label Format 2005 / DIGI 驱动使用）；
- * - [DIGI]：寺冈 Label Format 2005，55×50mm（7.4 Dot/mm）；
+ * - [DIGI]：寺冈 Label Format 2005（8442 族），55×50mm（7.4 Dot/mm）；
+ * - [DIGI_B]：寺冈 SM-120 / b 族 Free Format 编辑器，50×39mm；
  * - [MT_VIS_EDIT]：托利多 VisEdit（RL00 等），56×40mm；
  * - [MT_B_LABEL]：托利多 bLabel（bCom/bPro），56×40mm；
  * - [MT_SMART_LABEL]：托利多 SmartLabel（bPlus/FreshBase/bComS），53×44mm；
@@ -19,6 +37,7 @@ enum class LabelSystem(
 ) {
     GENERIC(40, 30),
     DIGI(55, 50),
+    DIGI_B(50, 39),
     MT_VIS_EDIT(56, 40),
     MT_B_LABEL(56, 40),
     MT_SMART_LABEL(53, 44),
@@ -74,6 +93,25 @@ enum class LabelSystem(
                 LabelElementKind.TAX,
                 LabelElementKind.TARE_WEIGHT,
                 LabelElementKind.SELLER,
+            )
+            // 寺冈 SM-120（b 族）Free Format：字段对齐 Item 列表
+            DIGI_B -> listOf(
+                LabelElementKind.PLU_NAME,
+                LabelElementKind.TOTAL_PRICE,
+                LabelElementKind.UNIT_PRICE,
+                LabelElementKind.WEIGHT,
+                LabelElementKind.PRODUCTION_DATE,
+                LabelElementKind.BARCODE,
+                LabelElementKind.SHELF_LIFE,
+                LabelElementKind.INGREDIENT,
+                LabelElementKind.SPECIAL_MSG,
+                LabelElementKind.TEXT,
+                LabelElementKind.AVERAGE_PRICE,
+                LabelElementKind.AVERAGE_WEIGHT,
+                LabelElementKind.BONUS_POINT,
+                LabelElementKind.ORIGIN,
+                LabelElementKind.TEMPERATURE,
+                LabelElementKind.MULTI_BARCODE,
             )
             MT_VIS_EDIT -> listOf(
                 LabelElementKind.PLU_NAME,
@@ -169,10 +207,45 @@ enum class LabelSystem(
             )
         }
 
+    /**
+     * 字段面板项（含槽位）：普通体系按 [fieldKinds] 生成；
+     * 寺冈 SM-120 额外提供 TEXT 2/5/6/8/9/10/11/15 文本槽。
+     */
+    val fieldEntries: List<LabelFieldEntry>
+        get() = when (this) {
+            DIGI_B -> listOf(
+                LabelFieldEntry.of(LabelElementKind.PLU_NAME),
+                // PRICE (-TAX)：税前价格
+                LabelFieldEntry(LabelElementKind.TOTAL_PRICE, "label.field.priceNoTax"),
+                LabelFieldEntry.of(LabelElementKind.UNIT_PRICE),
+                LabelFieldEntry.of(LabelElementKind.WEIGHT),
+                LabelFieldEntry.of(LabelElementKind.PRODUCTION_DATE),
+                LabelFieldEntry.of(LabelElementKind.BARCODE),
+                LabelFieldEntry.of(LabelElementKind.SHELF_LIFE),
+                LabelFieldEntry.of(LabelElementKind.INGREDIENT),
+                LabelFieldEntry.of(LabelElementKind.SPECIAL_MSG),
+                LabelFieldEntry(LabelElementKind.TEXT, "label.field.text2", "TEXT 2"),
+                LabelFieldEntry(LabelElementKind.TEXT, "label.field.text5", "TEXT 5"),
+                LabelFieldEntry(LabelElementKind.TEXT, "label.field.text6", "TEXT 6"),
+                LabelFieldEntry(LabelElementKind.TEXT, "label.field.text8", "TEXT 8"),
+                LabelFieldEntry(LabelElementKind.TEXT, "label.field.text9", "TEXT 9"),
+                LabelFieldEntry(LabelElementKind.TEXT, "label.field.text10", "TEXT 10"),
+                LabelFieldEntry(LabelElementKind.TEXT, "label.field.text11", "TEXT 11"),
+                LabelFieldEntry(LabelElementKind.TEXT, "label.field.text15", "TEXT 15"),
+                LabelFieldEntry.of(LabelElementKind.AVERAGE_PRICE),
+                LabelFieldEntry.of(LabelElementKind.AVERAGE_WEIGHT),
+                LabelFieldEntry.of(LabelElementKind.BONUS_POINT),
+                LabelFieldEntry.of(LabelElementKind.ORIGIN),
+                LabelFieldEntry.of(LabelElementKind.TEMPERATURE),
+                LabelFieldEntry.of(LabelElementKind.MULTI_BARCODE),
+            )
+            else -> fieldKinds.map { LabelFieldEntry.of(it) }
+        }
+
     /** 图形元素面板（文本/日期/二维码/外框/图像等）。 */
     val shapeKinds: List<LabelElementKind>
         get() = when (this) {
-            GENERIC, DIGI, MT_VIS_EDIT, MT_B_LABEL, DINGTOP -> listOf(
+            GENERIC, DIGI, DIGI_B, MT_VIS_EDIT, MT_B_LABEL, DINGTOP -> listOf(
                 LabelElementKind.TEXT,
                 LabelElementKind.DATE,
                 LabelElementKind.QRCODE,
@@ -193,6 +266,7 @@ enum class LabelSystem(
         get() = when (this) {
             GENERIC -> listOf(40 to 30, 50 to 30, 58 to 40, 60 to 40, 80 to 50)
             DIGI -> listOf(55 to 50, 56 to 40, 58 to 40, 60 to 40, 80 to 50, 40 to 30)
+            DIGI_B -> listOf(50 to 39, 56 to 40, 58 to 40, 60 to 40, 40 to 30, 80 to 50)
             MT_VIS_EDIT, MT_B_LABEL, DINGTOP -> listOf(56 to 40, 50 to 30, 58 to 40, 60 to 40, 80 to 50)
             MT_SMART_LABEL -> listOf(53 to 44, 56 to 40, 60 to 40, 80 to 50)
         }

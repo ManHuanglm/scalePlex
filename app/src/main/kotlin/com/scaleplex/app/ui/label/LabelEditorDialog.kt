@@ -41,6 +41,7 @@ import com.scaleplex.core.i18n.tr
 import com.scaleplex.core.model.BatchResult
 import com.scaleplex.core.model.LabelElement
 import com.scaleplex.core.model.LabelElementKind
+import com.scaleplex.core.model.LabelFieldEntry
 import com.scaleplex.core.model.LabelSystem
 import com.scaleplex.core.model.LabelTemplate
 import com.scaleplex.core.model.LabelTemplateJson
@@ -54,7 +55,8 @@ private val ROTATION_OPTIONS = listOf(0, 90, 180, 270)
 private val FONT_OPTIONS = listOf("宋体", "黑体", "楷体", "微软雅黑", "Arial")
 
 /** 元素添加时的默认几何尺寸（毫米）与占位文本；按纸张高度自动换列，避免元素落到纸外。 */
-private fun defaultElement(kind: LabelElementKind, template: LabelTemplate): LabelElement {
+private fun defaultElement(entry: LabelFieldEntry, template: LabelTemplate): LabelElement {
+    val kind = entry.kind
     val elementWidth = if (kind == LabelElementKind.FRAME) 30f else 24f
     val elementHeight = if (kind == LabelElementKind.FRAME) 20f else 6f
     val rowsPerColumn = ((template.heightMm - 8) / 5).coerceAtLeast(1)
@@ -65,9 +67,8 @@ private fun defaultElement(kind: LabelElementKind, template: LabelTemplate): Lab
         yMm = 4f + (index % rowsPerColumn) * 5f,
         widthMm = elementWidth.coerceAtMost((template.widthMm - 8).coerceAtLeast(8).toFloat()),
         heightMm = elementHeight.coerceAtMost((template.heightMm - 8).coerceAtLeast(4).toFloat()),
-        text = when (kind) {
-            LabelElementKind.BARCODE -> "69012345"
-            else -> ""
+        text = entry.defaultText.ifBlank {
+            if (kind == LabelElementKind.BARCODE) "69012345" else ""
         },
     )
 }
@@ -193,8 +194,8 @@ fun LabelEditorDialog(
                 Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     PaletteColumn(
                         system = template.system,
-                        onAdd = { kind ->
-                            updateElements { it + defaultElement(kind, template) }
+                        onAdd = { entry ->
+                            updateElements { it + defaultElement(entry, template) }
                             selected = template.elements.size - 1
                         },
                     )
@@ -272,6 +273,7 @@ fun LabelEditorDialog(
                         template.system.isMettler -> tr("label.mtHint")
                         template.system == LabelSystem.DINGTOP -> tr("label.dingtopHint")
                         template.system == LabelSystem.DIGI -> tr("label.digiHint")
+                        template.system == LabelSystem.DIGI_B -> tr("label.digiBHint")
                         else -> tr("label.selectHint")
                     },
                     fontSize = 11.sp,
@@ -316,18 +318,21 @@ fun LabelEditorDialog(
 }
 
 @Composable
-private fun PaletteColumn(system: LabelSystem, onAdd: (LabelElementKind) -> Unit) {
+private fun PaletteColumn(system: LabelSystem, onAdd: (LabelFieldEntry) -> Unit) {
     Column(modifier = Modifier.width(150.dp).fillMaxHeight().verticalScroll(rememberScrollState())) {
         Text(tr("label.pluFields"), fontSize = 13.sp, color = Color(0xFF1E88E5))
-        system.fieldKinds.forEach { kind ->
-            Button(onClick = { onAdd(kind) }, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-                Text(tr("label.kind." + kind.name))
+        system.fieldEntries.forEach { entry ->
+            Button(onClick = { onAdd(entry) }, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                Text(tr(entry.labelKey))
             }
         }
         Divider(Modifier.padding(vertical = 6.dp))
         Text(tr("label.shapes"), fontSize = 13.sp, color = Color(0xFF1E88E5))
         system.shapeKinds.forEach { kind ->
-            Button(onClick = { onAdd(kind) }, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+            Button(
+                onClick = { onAdd(LabelFieldEntry.of(kind)) },
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+            ) {
                 Text(tr("label.kind." + kind.name))
             }
         }

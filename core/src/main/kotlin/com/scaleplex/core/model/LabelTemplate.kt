@@ -147,6 +147,21 @@ enum class LabelElementKind {
 
     /** 部门号（与主组号区分）。 */
     DEPARTMENT,
+
+    /** 多条码（寺冈 SM-120：MULTI BARCODE）。 */
+    MULTI_BARCODE,
+
+    /** 平均价。 */
+    AVERAGE_PRICE,
+
+    /** 平均重量。 */
+    AVERAGE_WEIGHT,
+
+    /** 积分（BONUS POINT）。 */
+    BONUS_POINT,
+
+    /** 原产地。 */
+    ORIGIN,
 }
 
 data class LabelElement(
