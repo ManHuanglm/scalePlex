@@ -135,6 +135,18 @@ enum class LabelElementKind {
 
     /** 保质期。 */
     SHELF_LIFE,
+
+    /** 折扣值（寺冈 Label Format 2005）。 */
+    DISCOUNT,
+
+    /** 秤号。 */
+    SCALE_NO,
+
+    /** 售货员1。 */
+    SELLER,
+
+    /** 部门号（与主组号区分）。 */
+    DEPARTMENT,
 }
 
 data class LabelElement(

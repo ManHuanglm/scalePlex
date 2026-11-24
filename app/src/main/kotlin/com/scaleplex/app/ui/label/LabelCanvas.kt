@@ -291,8 +291,12 @@ private fun displayText(element: LabelElement): String = when (element.kind) {
     LabelElementKind.PRODUCTION_DATE -> "2026-01-01"
     LabelElementKind.SHELF_LIFE -> "7D"
     LabelElementKind.PREPACK_DISCOUNT -> "-10%"
+    LabelElementKind.DISCOUNT -> "-5%"
     LabelElementKind.TEMPERATURE -> "4°C"
+    LabelElementKind.SCALE_NO -> "001"
+    LabelElementKind.SELLER -> "01"
     LabelElementKind.MAIN_GROUP -> "997"
+    LabelElementKind.DEPARTMENT -> "01"
     LabelElementKind.DATE -> element.text.ifBlank { "2026-01-01" }
     LabelElementKind.LOGO -> tr("label.kind.LOGO")
     LabelElementKind.FRAME -> ""

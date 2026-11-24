@@ -42,7 +42,9 @@ object DigiLabelEncoder {
         LabelElementKind.QUANTITY_SYMBOL -> 0x0C
         LabelElementKind.INGREDIENT -> 0x0D
         LabelElementKind.SPECIAL_MSG -> 0x0E
-        LabelElementKind.MAIN_GROUP -> 0x0F
+        // 部门号对应 Label Format 2005「部门号」数据域；主组号编码待校准
+        LabelElementKind.DEPARTMENT -> 0x0F
+        LabelElementKind.MAIN_GROUP -> null
         LabelElementKind.TAXED_PRICE -> 0x10
         LabelElementKind.TAX -> 0x11
         LabelElementKind.FRAME -> 0x12
@@ -65,6 +67,9 @@ object DigiLabelEncoder {
         LabelElementKind.NET_WEIGHT,
         LabelElementKind.PRODUCTION_DATE,
         LabelElementKind.SHELF_LIFE,
+        LabelElementKind.DISCOUNT,
+        LabelElementKind.SCALE_NO,
+        LabelElementKind.SELLER,
         LabelElementKind.LOGO,
         -> null
     }

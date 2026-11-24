@@ -1,10 +1,11 @@
 package com.scaleplex.core.model
 
 /**
- * 标签体系：通用标签 + 托利多三种官方标签编辑器体系 + 顶尖 Aclas 标签编辑器。
+ * 标签体系：通用标签 + 寺冈 Label Format 2005 + 托利多三种官方标签编辑器体系 + 顶尖 Aclas 标签编辑器。
  *
  * 各体系的字段面板与常用纸张尺寸对齐对应编辑器：
  * - [GENERIC]：原有通用字段（寺冈 Label Format 2005 / DIGI 驱动使用）；
+ * - [DIGI]：寺冈 Label Format 2005，55×50mm（7.4 Dot/mm）；
  * - [MT_VIS_EDIT]：托利多 VisEdit（RL00 等），56×40mm；
  * - [MT_B_LABEL]：托利多 bLabel（bCom/bPro），56×40mm；
  * - [MT_SMART_LABEL]：托利多 SmartLabel（bPlus/FreshBase/bComS），53×44mm；
@@ -17,10 +18,15 @@ enum class LabelSystem(
     val defaultHeightMm: Int,
 ) {
     GENERIC(40, 30),
+    DIGI(55, 50),
     MT_VIS_EDIT(56, 40),
     MT_B_LABEL(56, 40),
     MT_SMART_LABEL(53, 44),
     DINGTOP(56, 40);
+
+    /** 打印点密度（Dot/mm）：寺冈 Label Format 2005 为 7.4，其余暂按 8 显示。 */
+    val dotsPerMm: Float
+        get() = if (this == DIGI) 7.4f else 8f
 
     /** 是否托利多官方编辑器体系（模板下发需经厂商工具）。 */
     val isMettler: Boolean get() = this == MT_VIS_EDIT || this == MT_B_LABEL || this == MT_SMART_LABEL
@@ -41,11 +47,33 @@ enum class LabelSystem(
                 LabelElementKind.PLU_NAME,
                 LabelElementKind.BARCODE,
                 LabelElementKind.SHOP_NAME,
-                LabelElementKind.MAIN_GROUP,
+                LabelElementKind.DEPARTMENT,
                 LabelElementKind.INGREDIENT,
                 LabelElementKind.SPECIAL_MSG,
                 LabelElementKind.TAXED_PRICE,
                 LabelElementKind.TAX,
+            )
+            // 寺冈 Label Format 2005：字段按左侧「商品数据」列表顺序
+            DIGI -> listOf(
+                LabelElementKind.PLU_NO,
+                LabelElementKind.TOTAL_PRICE,
+                LabelElementKind.UNIT_PRICE,
+                LabelElementKind.WEIGHT,
+                LabelElementKind.QUANTITY,
+                LabelElementKind.PLU_NAME,
+                LabelElementKind.QUANTITY_SYMBOL,
+                LabelElementKind.BARCODE,
+                LabelElementKind.SHOP_NAME,
+                LabelElementKind.DISCOUNT,
+                LabelElementKind.MAIN_GROUP,
+                LabelElementKind.DEPARTMENT,
+                LabelElementKind.SCALE_NO,
+                LabelElementKind.INGREDIENT,
+                LabelElementKind.SPECIAL_MSG,
+                LabelElementKind.TAXED_PRICE,
+                LabelElementKind.TAX,
+                LabelElementKind.TARE_WEIGHT,
+                LabelElementKind.SELLER,
             )
             MT_VIS_EDIT -> listOf(
                 LabelElementKind.PLU_NAME,
@@ -65,7 +93,7 @@ enum class LabelSystem(
                 LabelElementKind.QUANTITY,
                 LabelElementKind.TRACE_CODE,
                 LabelElementKind.SHOP_NAME,
-                LabelElementKind.MAIN_GROUP,
+                LabelElementKind.DEPARTMENT,
                 LabelElementKind.TAX,
                 LabelElementKind.TAXED_PRICE,
             )
@@ -85,7 +113,7 @@ enum class LabelSystem(
                 LabelElementKind.TRACE_CODE,
                 LabelElementKind.TARE_WEIGHT,
                 LabelElementKind.SHOP_NAME,
-                LabelElementKind.MAIN_GROUP,
+                LabelElementKind.DEPARTMENT,
                 LabelElementKind.TAX,
                 LabelElementKind.TAXED_PRICE,
             )
@@ -105,7 +133,7 @@ enum class LabelSystem(
                 LabelElementKind.DATE,
                 LabelElementKind.TRACE_CODE,
                 LabelElementKind.SHOP_NAME,
-                LabelElementKind.MAIN_GROUP,
+                LabelElementKind.DEPARTMENT,
                 LabelElementKind.TAX,
                 LabelElementKind.TAXED_PRICE,
             )
@@ -144,7 +172,7 @@ enum class LabelSystem(
     /** 图形元素面板（文本/日期/二维码/外框/图像等）。 */
     val shapeKinds: List<LabelElementKind>
         get() = when (this) {
-            GENERIC, MT_VIS_EDIT, MT_B_LABEL, DINGTOP -> listOf(
+            GENERIC, DIGI, MT_VIS_EDIT, MT_B_LABEL, DINGTOP -> listOf(
                 LabelElementKind.TEXT,
                 LabelElementKind.DATE,
                 LabelElementKind.QRCODE,
@@ -164,6 +192,7 @@ enum class LabelSystem(
     val sizePresets: List<Pair<Int, Int>>
         get() = when (this) {
             GENERIC -> listOf(40 to 30, 50 to 30, 58 to 40, 60 to 40, 80 to 50)
+            DIGI -> listOf(55 to 50, 56 to 40, 58 to 40, 60 to 40, 80 to 50, 40 to 30)
             MT_VIS_EDIT, MT_B_LABEL, DINGTOP -> listOf(56 to 40, 50 to 30, 58 to 40, 60 to 40, 80 to 50)
             MT_SMART_LABEL -> listOf(53 to 44, 56 to 40, 60 to 40, 80 to 50)
         }

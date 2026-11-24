@@ -271,6 +271,7 @@ fun LabelEditorDialog(
                     when {
                         template.system.isMettler -> tr("label.mtHint")
                         template.system == LabelSystem.DINGTOP -> tr("label.dingtopHint")
+                        template.system == LabelSystem.DIGI -> tr("label.digiHint")
                         else -> tr("label.selectHint")
                     },
                     fontSize = 11.sp,
@@ -351,8 +352,8 @@ private fun PropertyPanel(
         Text(tr("label.info"), fontSize = 13.sp, color = Color(0xFF1E88E5))
         InfoRow(tr("label.system"), tr("label.system." + template.system.name))
         InfoRow(tr("label.formatNo"), if (template.id > 0) template.id.toString() else "-")
-        InfoRow(tr("label.width"), "${template.widthMm} (mm) · ${template.widthMm * 8} (Dot)")
-        InfoRow(tr("label.height"), "${template.heightMm} (mm) · ${template.heightMm * 8} (Dot)")
+        InfoRow(tr("label.width"), "${template.widthMm} (mm) · ${dotCount(template.widthMm, template.system)} (Dot)")
+        InfoRow(tr("label.height"), "${template.heightMm} (mm) · ${dotCount(template.heightMm, template.system)} (Dot)")
         Divider(Modifier.padding(vertical = 4.dp))
 
         Text(tr("label.properties"), fontSize = 13.sp, color = Color(0xFF1E88E5))
@@ -433,6 +434,10 @@ private fun InfoRow(label: String, value: String) {
         Text(value, fontSize = 11.sp)
     }
 }
+
+/** 毫米 → 打印点数（按标签体系的点密度，如寺冈 Label Format 2005 为 7.4 Dot/mm）。 */
+private fun dotCount(mm: Int, system: LabelSystem): Int =
+    kotlin.math.round(mm * system.dotsPerMm).toInt()
 
 @Composable
 private fun SmallAction(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
