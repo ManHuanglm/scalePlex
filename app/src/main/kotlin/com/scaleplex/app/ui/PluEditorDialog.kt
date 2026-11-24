@@ -193,7 +193,7 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                 if (errors.isNotEmpty()) {
                     Column(modifier = Modifier.padding(top = 8.dp)) {
                         errors.forEach {
-                            Text(it, fontSize = 11.sp, color = Color(0xFFB00020))
+                            Text(it, fontSize = 11.sp, color = UiColors.Error)
                         }
                     }
                 }

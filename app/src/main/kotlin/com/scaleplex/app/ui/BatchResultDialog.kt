@@ -49,7 +49,7 @@ fun BatchResultDialog(
                             Text(
                                 "  PLU ${err.pluNo ?: "-"}: ${err.message}",
                                 fontSize = 11.sp,
-                                color = androidx.compose.ui.graphics.Color(0xFFB00020),
+                                color = UiColors.Error,
                             )
                         }
                         if (result.errors.size > 5) {

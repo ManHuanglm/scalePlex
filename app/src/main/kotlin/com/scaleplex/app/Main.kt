@@ -2,19 +2,22 @@ package com.scaleplex.app
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.WindowState
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import com.scaleplex.app.ui.ScalePlexApp
 import com.scaleplex.app.ui.Theme
 import com.scaleplex.core.i18n.I18n
 import com.scaleplex.db.Database
 import com.scaleplex.driver.impl.DriverRegistry
 import com.scaleplex.service.ConfigService
+import java.awt.Dimension
 import java.io.File
 
 /**
@@ -55,8 +58,14 @@ fun main() {
                 exitApplication()
             },
             title = I18n.t("app.title"),
-            state = WindowState(width = 1280.dp, height = 800.dp),
+            state = rememberWindowState(
+                width = 1280.dp,
+                height = 820.dp,
+                position = WindowPosition(Alignment.Center),
+            ),
         ) {
+            // 最小窗口尺寸：低于该尺寸时各面板内部滚动条保证内容仍可达
+            LaunchedEffect(Unit) { window.minimumSize = Dimension(1024, 680) }
             Theme(dark = state.darkMode) {
                 Surface(modifier = Modifier.fillMaxSize(), color = state.bgColor) {
                     ScalePlexApp(state)

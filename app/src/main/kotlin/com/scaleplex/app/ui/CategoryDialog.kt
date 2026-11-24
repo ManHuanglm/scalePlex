@@ -7,7 +7,6 @@ import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scaleplex.app.AppState
@@ -58,7 +57,7 @@ fun CategoryDialog(state: AppState, onDismiss: () -> Unit) {
                     }) { Text(tr("plu.save")) }
                 }
                 if (message.isNotBlank()) {
-                    Text(message, fontSize = 11.sp, color = Color(0xFFB00020), modifier = Modifier.padding(top = 4.dp))
+                    Text(message, fontSize = 11.sp, color = UiColors.Error, modifier = Modifier.padding(top = 4.dp))
                 }
                 Spacer(Modifier.height(8.dp))
                 Divider()
@@ -77,13 +76,18 @@ fun CategoryDialog(state: AppState, onDismiss: () -> Unit) {
                             TextButton(onClick = {
                                 state.categoryService.delete(cat.no)
                                 reload()
-                            }) { Text(tr("plu.delete"), fontSize = 12.sp, color = Color(0xFFB00020)) }
+                            }) { Text(tr("plu.delete"), fontSize = 12.sp, color = UiColors.Error) }
                         }
                         Divider()
                     }
                 }
                 if (categories.isEmpty()) {
-                    Text(tr("category.empty"), fontSize = 12.sp, color = Color(0xFF808080), modifier = Modifier.padding(8.dp))
+                    Text(
+                        tr("category.empty"),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(8.dp),
+                    )
                 }
             }
         },

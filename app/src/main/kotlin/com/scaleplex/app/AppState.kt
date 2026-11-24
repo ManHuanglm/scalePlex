@@ -66,6 +66,7 @@ class AppState(
         heartbeatJob = scope.launch {
             while (isActive) {
                 val devices = scaleService.devices()
+                syncRuntimes(devices)
                 coroutineScope {
                     devices.forEach { dev ->
                         launch {
@@ -78,10 +79,39 @@ class AppState(
         }
     }
 
+    /**
+     * 运行时状态表与设备表保持一致：移除已删除设备、为新增设备补默认状态，
+     * 保证界面上的设备总数在首轮探测尚未返回时也准确。
+     */
+    private fun syncRuntimes(devices: List<ScaleDevice>) {
+        val ids = devices.map { it.id }.toSet()
+        deviceRuntimes.keys.toList().forEach { id ->
+            if (id !in ids) deviceRuntimes.remove(id)
+        }
+        devices.forEach { dev ->
+            if (deviceRuntimes[dev.id] == null) deviceRuntimes[dev.id] = DeviceRuntime(dev)
+        }
+    }
+
     fun applyConfig(cfg: ScaleConfig) {
         config = cfg
         configService.save(cfg)
         commBus.rawCaptureEnabled.set(cfg.rawPacketLog)
+    }
+
+    /** 立即执行一轮协议级在线探测（侧边栏手动刷新用，不等待心跳周期）。 */
+    fun refreshDeviceStatus() {
+        scope.launch {
+            val devices = scaleService.devices()
+            syncRuntimes(devices)
+            coroutineScope {
+                devices.forEach { dev ->
+                    launch {
+                        deviceRuntimes[dev.id] = scaleService.probeStatus(dev)
+                    }
+                }
+            }
+        }
     }
 
     /**
