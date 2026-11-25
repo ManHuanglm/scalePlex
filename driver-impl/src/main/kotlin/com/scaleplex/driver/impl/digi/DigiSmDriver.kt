@@ -56,6 +56,10 @@ class DigiSmDriver(
 
     override val brand: ScaleBrand = ScaleBrand.DIGI
 
+    /** SMScaleAPI 仅提供 SyncDateTime 写入，无读取时间接口（SMScaleAPI.xls 全函数核对）。 */
+    override suspend fun readTime(): Result<java.time.LocalDateTime> =
+        Result.failure(UnsupportedOperationException("寺冈秤接口仅支持下发时间，不支持读取秤内时间"))
+
     override suspend fun connect(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             // ETP 族（SM-120）走 FTP+CSV，b 族走 SMScaleAPI.dll 桥接，8442 族走 TWS 工具链

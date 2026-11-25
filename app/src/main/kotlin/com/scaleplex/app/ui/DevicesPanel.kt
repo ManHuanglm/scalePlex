@@ -74,6 +74,7 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
     var showGroupEditor by remember { mutableStateOf(false) }
     var batchResults by remember { mutableStateOf<Map<Long, BatchResult>?>(null) }
     var editorMessage by remember { mutableStateOf<String?>(null) }
+    var showTimeSync by remember { mutableStateOf(false) }
     val checked = remember { mutableStateListOf<Long>() }
     val scope = rememberCoroutineScope()
 
@@ -88,11 +89,7 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
             subtitle = "${tr("common.total")} ${devices.size}${tr("common.count")} · " +
                 "${tr("status.online")} $online · ${tr("plu.checkedCount")} ${checked.size}",
         ) {
-            OutlinedButton(onClick = {
-                scope.launch {
-                    state.scaleService.devices().forEach { dev -> state.scaleService.syncTime(dev) }
-                }
-            }) { Text(tr("device.syncTime")) }
+            OutlinedButton(onClick = { showTimeSync = true }) { Text(tr("device.syncTime")) }
             Button(onClick = {
                 editing = ScaleDevice(name = "", brand = ScaleBrand.DIGI, groupId = groupFilter ?: 0)
                 showEditor = true
@@ -236,6 +233,9 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
         }
     }
 
+    if (showTimeSync) {
+        TimeSyncDialog(state, onDismiss = { showTimeSync = false })
+    }
     if (showEditor && editing != null) {
         DeviceEditorDialog(state, editing!!, groups, onDismiss = { showEditor = false }) {
             if (editing!!.id == 0L) state.scaleService.addDevice(it) else state.scaleService.updateDevice(it)

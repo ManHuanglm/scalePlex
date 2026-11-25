@@ -1,5 +1,6 @@
 package com.scaleplex.service
 
+import com.scaleplex.core.i18n.tr
 import com.scaleplex.core.model.BatchResult
 import com.scaleplex.core.model.DeviceStatus
 import com.scaleplex.core.model.DeviceRuntime
@@ -46,7 +47,20 @@ class ScaleService(db: Database) {
 
     // ---- devices ----
     fun devices(groupId: Long? = null): List<ScaleDevice> = deviceDao.list(groupId)
-    fun addDevice(d: ScaleDevice): Long = deviceDao.insert(d)
+
+    /**
+     * 新增设备：未选择分组时自动归入以品牌命名的分组（不存在则创建），
+     * 例：DIGI 寺冈 / 梅特勒-托利多 / 顶尖 / 大华。
+     */
+    fun addDevice(d: ScaleDevice): Long {
+        val groupId = if (d.groupId == 0L) {
+            groupDao.list().firstOrNull { it.name == d.brand.displayName }?.id
+                ?: groupDao.insert(ScaleGroup(name = d.brand.displayName, note = tr("group.autoBrand")))
+        } else {
+            d.groupId
+        }
+        return deviceDao.insert(d.copy(groupId = groupId))
+    }
     fun updateDevice(d: ScaleDevice) = deviceDao.update(d)
     suspend fun deleteDevice(id: Long) {
         drivers.remove(id)?.let { runCatching { it.disconnect() } }
@@ -163,4 +177,7 @@ class ScaleService(db: Database) {
         downloadLabelToDevices(devicesInGroup(groupId), template)
 
     suspend fun syncTime(device: ScaleDevice): Result<Unit> = driverFor(device).syncTime()
+
+    /** 读取秤内实时时钟（协议不支持时返回失败）。 */
+    suspend fun readTime(device: ScaleDevice): Result<java.time.LocalDateTime> = driverFor(device).readTime()
 }

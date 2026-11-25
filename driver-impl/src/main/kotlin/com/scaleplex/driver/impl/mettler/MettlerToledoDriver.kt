@@ -65,6 +65,30 @@ class MettlerToledoDriver(
         }
     }
 
+    /** 读取秤内实时时钟（DeviceTime Control=Read，真机校准 .231 bComS）。 */
+    override suspend fun readTime(): Result<java.time.LocalDateTime> = withContext(Dispatchers.IO) {
+        runCatching {
+            val taskId = MtScaleKeyXml.newTaskId()
+            val taskDir = newTaskDir(taskId)
+            File(taskDir, "DeviceList.xml").writeText(
+                MtScaleKeyXml.buildDeviceListXml(listOf(device), mapOf(device.id to "Commands.xml")), Charsets.UTF_8,
+            )
+            File(taskDir, "Commands.xml").writeText(
+                MtScaleKeyXml.buildCommandsXml(listOf(MtCommand(MtScaleKeyXml.CMD_DEVICE_TIME, control = "Read"))),
+                Charsets.UTF_8,
+            )
+            File(taskDir, "Task.xml").writeText(
+                MtScaleKeyXml.buildTaskXml(taskId, MtScaleKeyXml.TASK_TYPE_DOWNLOAD, "DeviceList.xml"), Charsets.UTF_8,
+            )
+            val resultFile = MtScaleKeyBridge.executeTask(taskDir, taskId).getOrElse { throw IllegalStateException(it.message) }
+            val xml = resultFile.readText(Charsets.UTF_8)
+            val dataFileName = MtScaleKeyXml.firstCommandDataFile(xml)
+                ?: error("DeviceTime 读取无数据文件（命令未执行成功）")
+            val dataXml = File(resultFile.parentFile, dataFileName).readText(Charsets.UTF_8)
+            MtScaleKeyXml.parseDeviceTime(dataXml) ?: error("DeviceTime 数据解析失败: ${dataXml.take(200)}")
+        }
+    }
+
     override suspend fun downloadPlu(plu: PluItem): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val results = downloadViaTask(listOf(plu), includePreset = plu.hotKey > 0)

@@ -208,6 +208,16 @@ object MtScaleKeyXml {
             .find(taskResultXml)?.groupValues?.get(1)
 
     /**
+     * 解析 DeviceTime 读取数据文件（真机校准 .231 bComS：嵌套元素，ISO 本地时间）：
+     * `<Data><DeviceTime AdjustTime="false"><DeviceTime>2026-11-25T19:20:28</DeviceTime></DeviceTime></Data>`
+     */
+    fun parseDeviceTime(dataXml: String): java.time.LocalDateTime? {
+        val raw = Regex("<DeviceTime[^>]*>\\s*<DeviceTime>([^<]+)</DeviceTime>", RegexOption.DOT_MATCHES_ALL)
+            .find(dataXml)?.groupValues?.get(1)?.trim() ?: return null
+        return runCatching { java.time.LocalDateTime.parse(raw) }.getOrNull()
+    }
+
+    /**
      * 解析任务结果 XML（TaskResult）：按 DeviceID 汇总每台秤的执行状态。
      * ReturnCode 非 Success / Status 为 Error 记入失败。
      */
