@@ -1,7 +1,6 @@
 package com.scaleplex.app.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,8 +11,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.AlertDialog
 import androidx.compose.material.Button
 import androidx.compose.material.DropdownMenu
@@ -26,6 +26,7 @@ import androidx.compose.material.TabRow
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -204,37 +205,50 @@ private fun FileLogView(devices: List<ScaleDevice>) {
             )
             TextButton(onClick = { refreshTick++ }) { Text(tr("log.refresh")) }
         }
-        LogLinesView(filtered)
+        LogLinesView(filtered, refreshTick)
     }
 }
 
-/** 等宽日志行渲染，ERROR/WARN 着色。 */
+/** 按日志级别着色：ERROR 红 / WARN 橙 / DEBUG、TRACE 弱化，其余正文色。 */
+private fun levelColor(line: String, base: Color): Color = when {
+    line.contains(" ERROR ") -> UiColors.Error
+    line.contains(" WARN ") -> Color(0xFFC98A00)
+    line.contains(" DEBUG ") -> base.copy(alpha = 0.55f)
+    line.contains(" TRACE ") -> base.copy(alpha = 0.45f)
+    else -> base
+}
+
+/**
+ * 等宽日志行渲染。LazyColumn 虚拟化 + 固定高度：避免在 AlertDialog 自带滚动容器内
+ * 嵌套 verticalScroll 导致的滚动空白区域；长行自动换行保证内容完整可见。
+ */
 @Composable
-private fun LogLinesView(lines: List<String>) {
-    Column(
+private fun LogLinesView(lines: List<String>, refreshTick: Int) {
+    val listState = rememberLazyListState()
+    // 打开/刷新时自动定位到最新日志（底部）
+    LaunchedEffect(lines.size, refreshTick) {
+        if (lines.isNotEmpty()) listState.scrollToItem(lines.size - 1)
+    }
+    LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 240.dp, max = 360.dp)
-            .verticalScroll(rememberScrollState())
+            .height(360.dp)
             .background(MaterialTheme.colors.onSurface.copy(alpha = 0.04f))
             .padding(6.dp),
+        state = listState,
     ) {
         if (lines.isEmpty()) {
-            Text(tr("log.file.missing"), fontSize = 12.sp, color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f))
-        }
-        lines.takeLast(400).forEach { line ->
-            val color = when {
-                line.contains(" ERROR ") -> UiColors.Error
-                line.contains(" WARN ") -> Color(0xFFC98A00)
-                else -> MaterialTheme.colors.onSurface
+            item {
+                Text(tr("log.file.missing"), fontSize = 12.sp, color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f))
             }
+        }
+        items(lines) { line ->
             Text(
                 line,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
-                color = color,
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                maxLines = 1,
+                color = levelColor(line, MaterialTheme.colors.onSurface),
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -271,37 +285,41 @@ private fun PacketView(state: AppState, devices: List<ScaleDevice>) {
             )
             TextButton(onClick = { refreshTick++ }) { Text(tr("log.refresh")) }
         }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 240.dp, max = 360.dp)
-                .verticalScroll(rememberScrollState())
-                .background(MaterialTheme.colors.onSurface.copy(alpha = 0.04f))
-                .padding(6.dp),
-        ) {
-            if (filtered.isEmpty()) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(filtered.size, refreshTick) {
+        if (filtered.isNotEmpty()) listState.scrollToItem(filtered.size - 1)
+    }
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(360.dp)
+            .background(MaterialTheme.colors.onSurface.copy(alpha = 0.04f))
+            .padding(6.dp),
+        state = listState,
+    ) {
+        if (filtered.isEmpty()) {
+            item {
                 Text(tr("log.packet.none"), fontSize = 12.sp, color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f))
             }
-            filtered.takeLast(200).forEach { p ->
-                val time = SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.ROOT).format(Date(p.timestampMs))
-                val dirColor = if (p.direction == com.scaleplex.communication.PacketDirection.TX) UiColors.Success else UiColors.Error
-                Text(
-                    "$time ${p.direction} ${p.remote} ${p.hex().take(96)}",
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    maxLines = 1,
-                )
-                Text(
-                    "    ${p.ascii().take(96)}",
-                    fontSize = 10.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = dirColor.copy(alpha = 0.7f),
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    maxLines = 1,
-                )
-            }
         }
+        items(filtered) { p ->
+            val time = SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.ROOT).format(Date(p.timestampMs))
+            val dirColor = if (p.direction == com.scaleplex.communication.PacketDirection.TX) UiColors.Success else UiColors.Error
+            Text(
+                "$time ${p.direction} ${p.remote} ${p.hex().take(96)}",
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                "    ${p.ascii().take(96)}",
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace,
+                color = dirColor.copy(alpha = 0.7f),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
     }
 }
