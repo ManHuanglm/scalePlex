@@ -193,6 +193,21 @@ object MtScaleKeyXml {
     }
 
     /**
+     * 解析 CheckOnline 结果数据文件内容（CommandResult.DataFile 引用的独立 XML）。
+     *
+     * 真机校准（2026-11-25）：秤关机时任务层仍全绿（TaskStatus=Complete、ReturnCode=OK、
+     * Succeeded=1），在线与否唯一权威是数据文件内 `<CheckOnline><Status>`：-1 = 离线。
+     */
+    fun parseCheckOnlineStatus(dataXml: String): Int? =
+        Regex("<CheckOnline>.*?<Status>(-?\\d+)</Status>", RegexOption.DOT_MATCHES_ALL)
+            .find(dataXml)?.groupValues?.get(1)?.toIntOrNull()
+
+    /** 提取 TaskResult 中首个 CommandResult 引用的数据文件名（相对任务目录）。 */
+    fun firstCommandDataFile(taskResultXml: String): String? =
+        Regex("<CommandResult>.*?<DataFile>(.*?)</DataFile>", RegexOption.DOT_MATCHES_ALL)
+            .find(taskResultXml)?.groupValues?.get(1)
+
+    /**
      * 解析任务结果 XML（TaskResult）：按 DeviceID 汇总每台秤的执行状态。
      * ReturnCode 非 Success / Status 为 Error 记入失败。
      */

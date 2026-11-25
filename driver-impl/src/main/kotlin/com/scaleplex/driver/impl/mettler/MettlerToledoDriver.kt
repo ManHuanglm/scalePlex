@@ -50,8 +50,19 @@ class MettlerToledoDriver(
                     Charsets.UTF_8,
                 )
             val resultFile = MtScaleKeyBridge.executeTask(taskDir, taskId).getOrElse { throw IllegalStateException(it.message) }
-            val status = MtScaleKeyXml.parseTaskResultXml(resultFile.readText(Charsets.UTF_8))[device.id]
-            val online = status?.ok == true || (status?.status in listOf("Complete", "Executing", "Output", "Prepare"))
+            val xml = resultFile.readText(Charsets.UTF_8)
+            val status = MtScaleKeyXml.parseTaskResultXml(xml)[device.id]
+            // 关机真机校准：ScaleKey 服务层任务恒 Complete/OK/Succeeded=1，不能作为在线依据；
+            // 唯一权威是 DataFile 内 CheckOnline/Status（-1=离线）。无数据文件时退回任务层判定。
+            val online = run {
+                val dataFileName = MtScaleKeyXml.firstCommandDataFile(xml)
+                val checkStatus = dataFileName?.let {
+                    runCatching { File(resultFile.parentFile, it).readText(Charsets.UTF_8) }.getOrNull()
+                        ?.let { MtScaleKeyXml.parseCheckOnlineStatus(it) }
+                }
+                checkStatus?.let { it >= 0 }
+                    ?: (status?.ok == true || status?.status in listOf("Complete", "Executing", "Output", "Prepare"))
+            }
             ScaleStatus(online = online, model = device.model.ifBlank { "Mettler Toledo" })
         }
     }
