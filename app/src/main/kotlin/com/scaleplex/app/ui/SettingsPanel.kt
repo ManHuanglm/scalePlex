@@ -102,7 +102,7 @@ fun SettingsPanel(state: AppState, refresh: MutableState<Int>) {
                         }
                     }
                     SettingRow(tr("settings.darkMode")) {
-                        Switch(state.darkMode, { state.darkMode = it })
+                        Switch(state.darkMode, { state.applyDarkMode(it) })
                     }
                 }
 
@@ -130,6 +130,22 @@ fun SettingsPanel(state: AppState, refresh: MutableState<Int>) {
                             cfg = cfg.copy(rawPacketLog = it)
                             state.applyConfig(cfg)
                         })
+                    }
+                    // 日志调试：查看运行日志/报文捕获（可按级别、设备、关键字筛选）
+                    var showLogDebug by remember { mutableStateOf(false) }
+                    SettingRow(tr("log.debug.actions")) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { showLogDebug = true }) { Text(tr("log.debug.open")) }
+                            OutlinedButton(onClick = {
+                                openLogFolder().fold(
+                                    onSuccess = { message = tr("log.folderOpened") },
+                                    onFailure = { message = tr("log.folderOpenFailed") + (it.message ?: "") },
+                                )
+                            }) { Text(tr("log.debug.openFolder")) }
+                        }
+                    }
+                    if (showLogDebug) {
+                        LogDebugDialog(state, onDismiss = { showLogDebug = false })
                     }
                     // 自动下发（参考银豹"自动下发"：启动后自动向全部秤下发一次全量 PLU）
                     SettingRow(tr("settings.autoDownload")) {

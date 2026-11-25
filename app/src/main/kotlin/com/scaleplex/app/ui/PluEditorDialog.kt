@@ -18,9 +18,13 @@ import com.scaleplex.core.model.PluTextLine
 import com.scaleplex.core.util.Numbers
 
 /**
- * 新增 / 编辑 PLU 弹窗，字段布局对齐 TOP2000「添加新品」表单：
- * 部门号、PLU编号、项目代码、单价(/Kg)、F1F2、保质期、商品名称、商品类型、成分、特殊信息，
- * 另保留品名英 / 成本 / 皮重 / 标签格式为「高级选项」折叠区。
+ * 新增 / 编辑 PLU 弹窗（按品牌分区，界面基线对齐 TOP2000「添加新品」表单）：
+ * - 顶部「编辑模板」下拉选择品牌，不同品牌展示各自的专属字段区；
+ * - 通用字段（全部品牌）：部门号、PLU编号、项目代码、单价(/Kg)、保质期、商品名称、
+ *   商品类型、成分、特殊信息；
+ * - 寺冈（DIGI）专属：F1F2、条码格式、标签格式1/2（DigiTables 对照表下拉）；
+ * - 托利多（MT）专属：折价/折扣/除皮价、包装/保质期打印标志、会员价/特价、附加文本号；
+ * - 高级选项（全部品牌）：品名英 / 成本 / 皮重 / 热键。
  * 保存前先本地校验、再交由 [onSave] 落库；[onSave] 返回错误信息（null = 成功），
  * 失败时错误就地提示，弹窗不关闭。
  */
@@ -31,12 +35,31 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
     var specialMsgText by remember { mutableStateOf(linesToText(initial.specialMsgLines)) }
     var showAdvanced by remember { mutableStateOf(false) }
     var errors by remember { mutableStateOf<List<String>>(emptyList()) }
+    // 编辑模板（品牌）：默认取系统设置中的默认品牌，切换仅影响本弹窗展示的字段区
+    var brand by remember { mutableStateOf(state.config.defaultBrand) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (initial.pluNo > 0 && initial.id > 0) tr("plu.edit") else tr("plu.add")) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState()).width(500.dp)) {
+                // ---- 编辑模板（品牌）下拉 ----
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(tr("plu.editor.brand"), Modifier.width(90.dp))
+                    var brandExpanded by remember { mutableStateOf(false) }
+                    OutlinedTextField(
+                        value = brand.displayName, onValueChange = {}, readOnly = true,
+                        modifier = Modifier.weight(1f).padding(vertical = 4.dp),
+                        trailingIcon = { TextButton(onClick = { brandExpanded = true }) { Text("▾") } },
+                    )
+                    DropdownMenu(brandExpanded, { brandExpanded = false }) {
+                        com.scaleplex.core.model.ScaleBrand.entries.forEach { b ->
+                            DropdownMenuItem(onClick = { brand = b; brandExpanded = false }) {
+                                Text(b.displayName)
+                            }
+                        }
+                    }
+                }
                 // ---- 类别（下拉，对齐顶尖类别资料） / PLU编号 ----
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val categories = remember { state.categoryService.all() }
@@ -78,9 +101,8 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                         modifier = Modifier.width(120.dp),
                     )
                 }
-                // ---- F1F2 / 保质期 / 保质期单位 ----
+                // ---- 保质期 / 保质期单位 ----
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Field(tr("plu.field.flag"), plu.flagData, Modifier.weight(1f)) { plu = plu.copy(flagData = it) }
                     Field(tr("plu.field.shelf"), plu.usedByDate.toString(), Modifier.weight(1f)) { s ->
                         s.toIntOrNull()?.let { plu = plu.copy(usedByDate = it.coerceAtLeast(0)) }
                     }
@@ -146,8 +168,42 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                     minLines = 3, maxLines = 5,
                 )
 
-                // ---- 托利多属性（对齐 Scale Manager 商品维护列，本地维护/下发映射待联调）----
-                Text(tr("plu.mt.section"), Modifier.padding(top = 8.dp))
+                // ---- 寺冈属性（DIGI 专属：F1F2 / 条码格式 / 标签格式，对照 SM.ini 定义表）----
+                if (brand == com.scaleplex.core.model.ScaleBrand.DIGI) {
+                    Text(tr("plu.digi.section"), Modifier.padding(top = 8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Field(tr("plu.field.flag"), plu.flagData, Modifier.weight(1f)) {
+                            plu = plu.copy(flagData = it.trim())
+                        }
+                        TableDropdownField(
+                            label = tr("plu.field.barFormat"),
+                            display = (DigiTables.EAN_BARCODE_FORMATS.firstOrNull { it.first == plu.barcodeFormat }?.second)
+                                ?: plu.barcodeFormat.toString(),
+                            options = DigiTables.EAN_BARCODE_FORMATS,
+                            modifier = Modifier.weight(1.4f),
+                        ) { plu = plu.copy(barcodeFormat = it) }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        TableDropdownField(
+                            label = tr("plu.field.label1"),
+                            display = (DigiTables.LABEL1_FORMATS.firstOrNull { it.first == plu.label1Format }?.second)
+                                ?: plu.label1Format.toString(),
+                            options = DigiTables.LABEL1_FORMATS,
+                            modifier = Modifier.weight(1f),
+                        ) { plu = plu.copy(label1Format = it) }
+                        TableDropdownField(
+                            label = tr("plu.field.label2"),
+                            display = (DigiTables.LABEL2_FORMATS.firstOrNull { it.first == plu.label2Format }?.second)
+                                ?: plu.label2Format.toString(),
+                            options = DigiTables.LABEL2_FORMATS,
+                            modifier = Modifier.weight(1f),
+                        ) { plu = plu.copy(label2Format = it) }
+                    }
+                }
+
+                // ---- 托利多属性（MT 专属，对齐 Scale Manager 商品维护列，本地维护/下发映射待联调）----
+                if (brand == com.scaleplex.core.model.ScaleBrand.METTLER_TOLEDO) {
+                    Text(tr("plu.mt.section"), Modifier.padding(top = 8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     CheckField(tr("plu.mt.allowMarkdown"), plu.allowMarkdown) { plu = plu.copy(allowMarkdown = it) }
                     CheckField(tr("plu.mt.allowDiscount"), plu.allowDiscount) { plu = plu.copy(allowDiscount = it) }
@@ -189,6 +245,15 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                         s.toIntOrNull()?.let { plu = plu.copy(extraTextNo = it.coerceAtLeast(0)) }
                     }
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Field(tr("plu.memberPrice"), Numbers.minorToDisplay(plu.memberPrice, state.config.priceDecimals), Modifier.weight(1f)) {
+                        plu = plu.copy(memberPrice = Numbers.displayToMinor(it, state.config.priceDecimals))
+                    }
+                    Field(tr("plu.specialPrice"), Numbers.minorToDisplay(plu.specialPrice, state.config.priceDecimals), Modifier.weight(1f)) {
+                        plu = plu.copy(specialPrice = Numbers.displayToMinor(it, state.config.priceDecimals))
+                    }
+                }
+                }
 
                 // ---- 高级选项 ----
                 TextButton(onClick = { showAdvanced = !showAdvanced }, modifier = Modifier.align(Alignment.Start)) {
@@ -206,30 +271,6 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                     }
                     Field(tr("plu.hotkey"), if (plu.hotKey > 0) plu.hotKey.toString() else "", Modifier.fillMaxWidth()) { s ->
                         s.toIntOrNull()?.let { plu = plu.copy(hotKey = it.coerceIn(0, 999)) }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Field(tr("plu.memberPrice"), Numbers.minorToDisplay(plu.memberPrice, state.config.priceDecimals), Modifier.weight(1f)) {
-                            plu = plu.copy(memberPrice = Numbers.displayToMinor(it, state.config.priceDecimals))
-                        }
-                        Field(tr("plu.specialPrice"), Numbers.minorToDisplay(plu.specialPrice, state.config.priceDecimals), Modifier.weight(1f)) {
-                            plu = plu.copy(specialPrice = Numbers.displayToMinor(it, state.config.priceDecimals))
-                        }
-                    }
-                    var labelExpanded by remember { mutableStateOf(false) }
-                    OutlinedTextField(
-                        value = (DigiTables.LABEL1_FORMATS.firstOrNull { it.first == plu.label1Format }?.second)
-                            ?: plu.label1Format.toString(),
-                        onValueChange = {}, readOnly = true,
-                        label = { Text(tr("plu.field.label1")) },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        trailingIcon = { TextButton(onClick = { labelExpanded = true }) { Text("▾") } },
-                    )
-                    DropdownMenu(labelExpanded, { labelExpanded = false }) {
-                        DigiTables.LABEL1_FORMATS.forEach { (no, name) ->
-                            DropdownMenuItem(onClick = { plu = plu.copy(label1Format = no); labelExpanded = false }) {
-                                Text(name)
-                            }
-                        }
                     }
                 }
 
@@ -270,6 +311,31 @@ private fun Field(label: String, value: String, modifier: Modifier = Modifier, o
         value = value, onValueChange = onChange, label = { Text(label) },
         modifier = modifier.padding(vertical = 4.dp),
     )
+}
+
+/** 品牌专属字段通用下拉（编号+名称对照表，如 DIGI 标签/条码格式表）。 */
+@Composable
+private fun TableDropdownField(
+    label: String,
+    display: String,
+    options: List<Pair<Int, String>>,
+    modifier: Modifier = Modifier,
+    onSelect: (Int) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value = display, onValueChange = {}, readOnly = true,
+        label = { Text(label) },
+        modifier = modifier.padding(vertical = 4.dp),
+        trailingIcon = { TextButton(onClick = { expanded = true }) { Text("▾") } },
+    )
+    DropdownMenu(expanded, { expanded = false }) {
+        options.forEach { (no, name) ->
+            DropdownMenuItem(onClick = { onSelect(no); expanded = false }) {
+                Text("$no · $name")
+            }
+        }
+    }
 }
 
 /** 是/否勾选项（托利多属性）。 */

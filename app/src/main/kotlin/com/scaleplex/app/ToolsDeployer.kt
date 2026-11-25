@@ -19,8 +19,13 @@ object ToolsDeployer {
         "dahua" to listOf("DhScalePluNet.dll", "dhplunet.dll"),
         // 顶尖 AclasSDK.dll + AclasSDK.ini
         "aclas" to listOf("AclasSDK.dll", "AclasSDK.ini"),
-        // 托利多 MTScaleAPI.dll（MTScaleKey 接口程序）
-        "mettler" to listOf("MTScaleAPI.dll"),
+        // 托利多 MTScaleAPI.dll（无服务模式全套依赖 + MTScaleKey.config，缺依赖无法加载）
+        "mettler" to listOf(
+            "MTScaleAPI.dll", "MTCommonScaleAPI.dll", "MTConfiguration.dll", "MTScaleKeyData.dll",
+            "MTSTDData.dll", "MTXML.dll", "MTZip.dll", "Platform.dll", "Framework.dll",
+            "MTLogger.dll", "MTJson.dll", "MTEncrypt.dll", "TransferEth.dll",
+            "msvcp100.dll", "msvcr100.dll", "MTScaleKey.config",
+        ),
     )
 
     /** 释放全部品牌工具，返回工具根目录（`<dataDir>/tools`）。 */

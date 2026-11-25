@@ -46,12 +46,15 @@ data class BatchError(
 /** Global application configuration (persisted to app_config). */
 data class ScaleConfig(
     val language: String = "zh-CN",
+    /** 深色主题（界面设置，随配置持久化）。 */
+    val darkMode: Boolean = false,
     val priceDecimals: Int = 2,
     val weightDecimals: Int = 3,
     val connectTimeoutMs: Int = 3000,
     val readTimeoutMs: Int = 2000,
     val retries: Int = 3,
-    val heartbeatIntervalMs: Int = 5000,
+    /** 心跳间隔（寺冈 b 族限流：5s 连续探测会触发秤端连接锁，默认 30s 实测稳定）。 */
+    val heartbeatIntervalMs: Int = 30000,
     val defaultBrand: ScaleBrand = ScaleBrand.DIGI,
     val rawPacketLog: Boolean = false,
     val logLevel: String = "INFO",

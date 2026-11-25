@@ -30,12 +30,14 @@ import java.io.File
  * `data/tools/<brand>/`，驱动桥接默认即用，无需手动配置工具目录。
  */
 fun main() {
-    DriverRegistry.install()
-
+    // 数据目录属性须最先设置：logback 在首次取 logger 时初始化，日志文件路径依赖该属性
     val portable = File(System.getProperty("user.dir"), "data")
     val dataDir = if (usable(portable)) portable
     else File(System.getProperty("user.home"), ".scaleplex").apply { mkdirs() }
     System.setProperty("scaleplex.data.dir", dataDir.absolutePath)
+
+    DriverRegistry.install()
+
     val toolsDir = ToolsDeployer.deploy(dataDir)
     System.setProperty("scaleplex.tools.dir", toolsDir.absolutePath)
 
@@ -76,9 +78,11 @@ fun main() {
     }
 }
 
-/** 判断目录可用于便携数据（可创建且可写）。 */
+/** 判断目录可用于便携数据（存在或可创建，且可写）。 */
 private fun usable(dir: File): Boolean = try {
-    dir.mkdirs() && dir.isDirectory && dir.canWrite()
+    // 注意：mkdirs() 对已存在目录返回 false，不能直接作为判据（否则 data/ 一旦存在
+    // 便永久回退 ~/.scaleplex，便携数据库失效）
+    (dir.isDirectory || dir.mkdirs()) && dir.canWrite()
 } catch (_: Exception) {
     false
 }
