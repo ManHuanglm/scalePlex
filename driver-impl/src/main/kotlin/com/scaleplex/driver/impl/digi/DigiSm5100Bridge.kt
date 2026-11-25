@@ -178,7 +178,10 @@ object DigiSm5100Bridge {
 |Write-Output '{"connected":true,"ret":0,"detail":"time"}'
 """
             Mode.PROBE -> """
-|if (${'$'}s.ToInt64() -gt 0) { Write-Output '{"connected":true,"ret":0,"detail":"probe"}' } else { Write-Output '{"connected":false,"ret":-1,"detail":"connect failed"}' }
+|${'$'}buf = New-Object byte[] ${DigiSm5100PluCodec.STRUCT_SIZE}
+|${'$'}r = -1
+|if (${'$'}s.ToInt64() -gt 0) { ${'$'}r = [SmApi]::RDPluFAsLabel(${'$'}s, 1, ${'$'}buf) }
+|if (${'$'}s.ToInt64() -gt 0 -and ${'$'}r -ne -1) { Write-Output ('{{"connected":true,"ret":' + ${'$'}r + ',"detail":"probe"}}') } else { Write-Output ('{{"connected":false,"ret":' + ${'$'}r + ',"detail":"probe api fail"}}') }
 """
         }
         return """

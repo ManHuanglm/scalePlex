@@ -53,8 +53,8 @@ data class ScaleConfig(
     val connectTimeoutMs: Int = 3000,
     val readTimeoutMs: Int = 2000,
     val retries: Int = 3,
-    /** 心跳间隔（寺冈 b 族限流：5s 连续探测会触发秤端连接锁，默认 30s 实测稳定）。 */
-    val heartbeatIntervalMs: Int = 30000,
+    /** 在线检测心跳间隔，可选 5s~10min（寺冈 b 族过密探测会触发秤端连接锁，默认 1 分钟）。 */
+    val heartbeatIntervalMs: Int = 60000,
     val defaultBrand: ScaleBrand = ScaleBrand.DIGI,
     val rawPacketLog: Boolean = false,
     val logLevel: String = "INFO",

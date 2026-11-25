@@ -117,8 +117,23 @@ fun SettingsPanel(state: AppState, refresh: MutableState<Int>) {
                         NumberField(cfg.retries.toString(), 100.dp) { n -> cfg = cfg.copy(retries = n) }
                     }
                     SettingRow(tr("settings.heartbeat")) {
-                        NumberField(cfg.heartbeatIntervalMs.toString(), 140.dp) { n ->
-                            cfg = cfg.copy(heartbeatIntervalMs = n)
+                        // 在线检测间隔预设：5s ~ 10 分钟可选（寺冈 b 族过密探测会触发秤端连接锁）
+                        var hbExpanded by remember { mutableStateOf(false) }
+                        val hbOptions = listOf(5000, 10000, 30000, 60000, 120000, 300000, 600000)
+                        fun hbLabel(ms: Int): String =
+                            if (ms < 60000) "${ms / 1000} ${tr("time.seconds")}" else "${ms / 60000} ${tr("time.minutes")}"
+                        Box {
+                            OutlinedButton(onClick = { hbExpanded = true }) {
+                                Text(hbLabel(cfg.heartbeatIntervalMs), fontSize = 12.sp)
+                            }
+                            DropdownMenu(hbExpanded, { hbExpanded = false }) {
+                                hbOptions.forEach { ms ->
+                                    DropdownMenuItem(onClick = {
+                                        cfg = cfg.copy(heartbeatIntervalMs = ms)
+                                        hbExpanded = false
+                                    }) { Text(hbLabel(ms)) }
+                                }
+                            }
                         }
                     }
                 }

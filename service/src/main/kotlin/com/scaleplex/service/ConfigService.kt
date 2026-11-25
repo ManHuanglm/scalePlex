@@ -25,7 +25,7 @@ class ConfigService(db: Database) {
             connectTimeoutMs = (g("connectTimeoutMs", "3000")).toIntOrNull() ?: 3000,
             readTimeoutMs = (g("readTimeoutMs", "2000")).toIntOrNull() ?: 2000,
             retries = (g("retries", "3")).toIntOrNull() ?: 3,
-            heartbeatIntervalMs = (g("heartbeatIntervalMs", "30000")).toIntOrNull() ?: 30000,
+            heartbeatIntervalMs = (g("heartbeatIntervalMs", "60000")).toIntOrNull()?.coerceIn(5000, 600000) ?: 60000,
             defaultBrand = ScaleBrand.fromId(g("defaultBrand", "digi")),
             rawPacketLog = g("rawPacketLog", "false").toBoolean(),
             logLevel = g("logLevel", "INFO"),
