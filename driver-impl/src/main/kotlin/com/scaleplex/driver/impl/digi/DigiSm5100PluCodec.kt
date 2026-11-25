@@ -24,6 +24,9 @@ import java.nio.charset.Charset
  * SPMessage[30]  ×30                                                                 (3120)
  * ```
  * 价格/日期为整数（隐含小数位由秤端设置）；文本 GBK。
+ *
+ * 真机校准（SM-110N STE57+，192.168.0.55）：秤端整数一律**小端**（Delphi/x86 原生布局），
+ * 大端编码会导致秤端解析出非法 PLU 号而静默丢弃（SendLPlu 仍返回 0x06）。
  */
 object DigiSm5100PluCodec {
 
@@ -101,6 +104,9 @@ object DigiSm5100PluCodec {
         val spMessages = readTextEntries(data, OFF_SP_MESSAGE, 30)
         val weightUnit = getInt(data, OFF_WEIGHT_UNIT)
         val itemCode = String(data, OFF_EAN_DATA, 10, GBK).trimEnd('\u0000', ' ')
+        // 空闲槽/系统标记记录过滤（真机校准）：秤端删除 PLU 后会显露 pluNo≈999997 的
+        // 空槽标记（无品名、无项目代码、价格 0），非用户数据
+        if (commodity.none { it.text.isNotBlank() } && itemCode.isBlank()) return null
         return PluItem(
             pluNo = pluNo,
             weightFlag = weightFlagOf(weightUnit),
@@ -131,17 +137,18 @@ object DigiSm5100PluCodec {
     private fun weightFlagOf(weightUnit: Int): Int = if (weightUnit == 1) 1 else 0
 
     private fun putInt(b: ByteArray, off: Int, v: Int) {
-        b[off] = (v shr 24).toByte()
-        b[off + 1] = (v shr 16).toByte()
-        b[off + 2] = (v shr 8).toByte()
-        b[off + 3] = v.toByte()
+        // 小端（Delphi/x86 原生；真机校准，见类注释）
+        b[off] = v.toByte()
+        b[off + 1] = (v shr 8).toByte()
+        b[off + 2] = (v shr 16).toByte()
+        b[off + 3] = (v shr 24).toByte()
     }
 
     private fun getInt(b: ByteArray, off: Int): Int =
-        ((b[off].toInt() and 0xFF) shl 24) or
-            ((b[off + 1].toInt() and 0xFF) shl 16) or
-            ((b[off + 2].toInt() and 0xFF) shl 8) or
-            (b[off + 3].toInt() and 0xFF)
+        (b[off].toInt() and 0xFF) or
+            ((b[off + 1].toInt() and 0xFF) shl 8) or
+            ((b[off + 2].toInt() and 0xFF) shl 16) or
+            ((b[off + 3].toInt() and 0xFF) shl 24)
 
     /** 写文本区（SM_ASCII_TXT：TwsFontSize int + GBK 文本 char[100]，每条 [TXT_ENTRY_SIZE]）。 */
     private fun putTextEntries(b: ByteArray, base: Int, count: Int, lines: List<PluTextLine>) {

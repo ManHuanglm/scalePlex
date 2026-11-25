@@ -19,12 +19,18 @@ class DigiModelFamilyTest {
     @Test
     fun `b family models`() {
         assertEquals(DigiModelFamily.FAMILY_B, DigiModelFamily.fromModel("SM-110N"))
-        assertEquals(DigiModelFamily.FAMILY_B, DigiModelFamily.fromModel("SM-120"))
         assertEquals(DigiModelFamily.FAMILY_B, DigiModelFamily.fromModel("SM-5100"))
         assertEquals(DigiModelFamily.FAMILY_B, DigiModelFamily.fromModel("bCom"))
         assertEquals(DigiModelFamily.FAMILY_B, DigiModelFamily.fromModel("bPro"))
         assertEquals(DigiModelFamily.FAMILY_B, DigiModelFamily.fromModel("bTwin"))
         assertEquals(DigiModelFamily.FAMILY_B, DigiModelFamily.fromModel("SM110N STE57"))
+    }
+
+    @Test
+    fun `etp family models`() {
+        // 真机校准：SM-120 为 ETP 平台（FTP+CSV），不再归入 b 族
+        assertEquals(DigiModelFamily.FAMILY_ETP, DigiModelFamily.fromModel("SM-120"))
+        assertEquals(DigiModelFamily.FAMILY_ETP, DigiModelFamily.fromModel("sm120"))
     }
 
     @Test

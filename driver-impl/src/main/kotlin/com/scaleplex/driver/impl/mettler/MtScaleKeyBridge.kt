@@ -67,7 +67,12 @@ object MtScaleKeyBridge {
 
                 val process = ProcessBuilder(
                     ps.absolutePath, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1.absolutePath,
-                ).redirectErrorStream(true).start()
+                )
+                    // 工作目录切到 DLL 所在目录：MTScaleAPI.dll 的依赖（MTScaleKeyData/MTConfiguration 等）
+                    // 与 MTScaleKey.config 都在其旁，Windows 加载器按 CWD 搜索依赖
+                    .directory(File(dll).parentFile)
+                    .redirectErrorStream(true)
+                    .start()
 
                 val output = process.inputStream.readBytes().toString(java.nio.charset.Charset.defaultCharset())
                 val finished = process.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)

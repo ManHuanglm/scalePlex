@@ -16,7 +16,11 @@ import java.util.concurrent.TimeUnit
  * - `SyncDateTime(s)`：时间同步；`ReadReceiptDetail(s, RecordNo, Receipt_D*)`：流水（暂未接入）。
  * - `CloseConnect(s)`：关闭连接。
  *
- * 返回值 0=无错误，-1=错误（SMScaleAPI.xls）。DLL 为 32 位原生，64 位 JVM 无法进程内加载
+ * 返回值语义（SMScaleAPI.xls + 官方 Delphi Demo Unit1.pas + 真机 SM-110N 校准）：
+ * - 读操作（RDPluFAsLabel 等）：0x00=成功，0xE0=读取出错，0xE2=无数据；
+ * - 写操作（SendLPlu/SendRPlu/DelPluRecord/DelPluFile/SyncDateTime）：**0x06=成功**，
+ *   0xE1=写入出错，0xE2=内存不足。
+ * DLL 为 32 位原生，64 位 JVM 无法进程内加载
  * → 32 位 PowerShell（SysWOW64）+ P/Invoke 桥接，PLU 结构字节由 Kotlin 侧组装，
  * PS 仅传递 byte[]。工具目录 = 系统属性 `scaleplex.digi.tools`（含 SM5100DLL 目录下的 SMScaleAPI.dll）。
  */
@@ -31,6 +35,9 @@ object DigiSm5100Bridge {
 
     /** 会话执行模式。 */
     enum class Mode { DOWN, UP, DEL_RECORD, DEL_ALL, TIME, PROBE }
+
+    /** 写操作成功码（真机校准：SendLPlu/DelPluRecord/DelPluFile/SyncDateTime 成功返回 0x06）。 */
+    const val WRITE_OK = 6
 
     /** 会话结果。 */
     data class SessionResult(
@@ -72,6 +79,7 @@ object DigiSm5100Bridge {
      * - DEL_RECORD：[recordNo] 指定记录号；DEL_ALL/TIME/PROBE 无需数据。
      */
     fun execute(ip: String, mode: Mode, dataFile: File? = null, recordNo: Int = 0, timeoutMs: Long = 300_000): SessionResult {
+        log.info("SM5100 {}:{} mode={} recordNo={} timeout={}ms", ip, portOf(ip), mode, recordNo, timeoutMs)
         val dll = dllPath() ?: error("SM5100 SMScaleAPI.dll 未找到（系统设置：寺冈工具目录下 ${DLL_SUBDIR}\\$DLL_NAME）")
         val outPath = dataFile?.absolutePath ?: ""
         val ps1 = File(System.getProperty("java.io.tmpdir"), "scaleplex-sm5100-${mode.name.lowercase()}.ps1")
@@ -96,7 +104,7 @@ object DigiSm5100Bridge {
         }
         val json = output.lineSequence().map { it.trim() }.firstOrNull { it.startsWith("{") }
             ?: error("SMScaleAPI 桥接无结果: ${output.take(200)}")
-        return parseResult(json)
+        return parseResult(json).also { log.info("SM5100 {} result: {}", ip, it) }
     }
 
     private fun parseResult(json: String): SessionResult {
@@ -118,17 +126,19 @@ object DigiSm5100Bridge {
     private fun buildScript(dllPath: String, ip: String, mode: Mode, dataPath: String, recordNo: Int): String {
         val port = portOf(ip)
         val modeInit = when (mode) {
+            // 注意：脚本消息必须纯 ASCII —— Windows PowerShell 5 将无 BOM 的 .ps1 按 ANSI(GBK)
+            // 解析，UTF-8 中文会导致字符串字面量乱码、脚本报错（真机联调发现）。
             Mode.DOWN -> """
 |${'$'}bytes = [System.IO.File]::ReadAllBytes('$dataPath')
 |${'$'}size = ${DigiSm5100PluCodec.STRUCT_SIZE}
-|if ((${'$'}bytes.Length % ${'$'}size) -ne 0) { throw "PLU 流文件大小 (${'$'}(${'$'}bytes.Length)) 不是 ${'$'}size 的整数倍" }
+|if ((${'$'}bytes.Length % ${'$'}size) -ne 0) { throw "PLU stream size (${'$'}(${'$'}bytes.Length)) is not a multiple of ${'$'}size" }
 |${'$'}count = ${'$'}bytes.Length / ${'$'}size
 |${'$'}sent = 0
 |for (${'$'}i = 0; ${'$'}i -lt ${'$'}count; ${'$'}i++) {
 |    ${'$'}chunk = New-Object byte[] ${'$'}size
 |    [Array]::Copy(${'$'}bytes, (${'$'}i * ${'$'}size), ${'$'}chunk, 0, ${'$'}size)
 |    ${'$'}r = [SmApi]::SendLPlu(${'$'}s, ${'$'}chunk)
-|    if (${'$'}r -ne 0) { throw "SendLPlu 第 $(${'$'}i+1) 条失败 ret=$({'$'}r)" }
+|    if (${'$'}r -ne 0 -and ${'$'}r -ne ${DigiSm5100Bridge.WRITE_OK}) { throw "SendLPlu record ${'$'}(${'$'}i+1) failed ret=${'$'}r" }
 |    ${'$'}sent++
 |}
 |Write-Output ('{{"connected":true,"ret":0,"count":' + ${'$'}sent + ',"detail":"down"}}')
@@ -154,21 +164,21 @@ object DigiSm5100Bridge {
 """
             Mode.DEL_RECORD -> """
 |${'$'}r = [SmApi]::DelPluRecord(${'$'}s, $recordNo)
-|if (${'$'}r -ne 0) { throw "DelPluRecord($recordNo) 失败 ret=$({'$'}r)" }
+|if (${'$'}r -ne 0 -and ${'$'}r -ne ${DigiSm5100Bridge.WRITE_OK}) { throw "DelPluRecord($recordNo) failed ret=${'$'}r" }
 |Write-Output '{"connected":true,"ret":0,"detail":"delRecord"}'
 """
             Mode.DEL_ALL -> """
 |${'$'}r = [SmApi]::DelPluFile(${'$'}s)
-|if (${'$'}r -ne 0) { throw "DelPluFile 失败 ret=$({'$'}r)" }
+|if (${'$'}r -ne 0 -and ${'$'}r -ne ${DigiSm5100Bridge.WRITE_OK}) { throw "DelPluFile failed ret=${'$'}r" }
 |Write-Output '{"connected":true,"ret":0,"detail":"delAll"}'
 """
             Mode.TIME -> """
 |${'$'}r = [SmApi]::SyncDateTime(${'$'}s)
-|if (${'$'}r -ne 0) { throw "SyncDateTime 失败 ret=$({'$'}r)" }
+|if (${'$'}r -ne 0 -and ${'$'}r -ne ${DigiSm5100Bridge.WRITE_OK}) { throw "SyncDateTime failed ret=${'$'}r" }
 |Write-Output '{"connected":true,"ret":0,"detail":"time"}'
 """
             Mode.PROBE -> """
-|if (${'$'}s -gt 0) { Write-Output '{"connected":true,"ret":0,"detail":"probe"}' } else { Write-Output '{"connected":false,"ret":-1,"detail":"connect failed"}' }
+|if (${'$'}s.ToInt64() -gt 0) { Write-Output '{"connected":true,"ret":0,"detail":"probe"}' } else { Write-Output '{"connected":false,"ret":-1,"detail":"connect failed"}' }
 """
         }
         return """

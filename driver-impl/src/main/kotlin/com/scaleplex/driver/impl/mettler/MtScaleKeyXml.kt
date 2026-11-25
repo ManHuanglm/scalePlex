@@ -18,10 +18,10 @@ import java.util.UUID
  */
 object MtScaleKeyXml {
 
-    /** 任务类型：0 下发数据、3 回收流水、4 检查在线状态、100 设置参数。 */
+    /** 任务类型：0 下发数据、1 回收流水、3 检查在线状态、4 自动发现设备、100 设置参数（文档 §3.1）。 */
     const val TASK_TYPE_DOWNLOAD = 0
-    const val TASK_TYPE_TRADE_LOG = 3
-    const val TASK_TYPE_CHECK_ONLINE = 4
+    const val TASK_TYPE_TRADE_LOG = 1
+    const val TASK_TYPE_CHECK_ONLINE = 3
 
     /** 命令字名称（文档 §3.5）。 */
     const val CMD_ITEM = "Item"
@@ -203,7 +203,8 @@ object MtScaleKeyXml {
             val block = m.groupValues[1]
             val deviceId = block.intValue("DeviceID") ?: return@forEach
             val returnCode = block.textValue("ReturnCode") ?: "Unknown"
-            val status = block.textValue("Status") ?: "Unknown"
+            // 注意：结果 XML 的状态字段名是 TaskStatus（真机校准，误读 Status 会恒为 null）
+            val status = block.textValue("TaskStatus") ?: "Unknown"
             val percent = block.intValue("Percent") ?: 0
             val commandErrors = Regex("<CommandResult>(.*?)</CommandResult>", RegexOption.DOT_MATCHES_ALL)
                 .findAll(block)
@@ -224,8 +225,11 @@ object MtScaleKeyXml {
 
     /**
      * 解析商品数据 Data XML（Item Read/ReadAll 回收结果）→ PLU 列表。
-     * 映射与 [buildItemDataXml] 互逆：PLU、AlternativeItemID、ItemName(zho/eng)、
-     * ItemPrice(文本价格 ×100 → minor、KGM/PCS)、Date BestBefore、LabelFormatID。
+     * 真机 RL00 回收格式（2026-11-25 校准）：
+     * - `<Description Type="ItemName">名称</Description>`（**无 Language 属性**，有则按语言区分）；
+     * - 价格为显示值文本（如 `120` = 120.00 元/KGM），×100 转最小单位；
+     * - 日期为 `<DateOffset Type="BestBefore" UnitOfOffset="day" ...>3</DateOffset>`（非 Date 元素）；
+     * - 条码 `<AlternativeItemID>` 为 13 位补零数字串，还原时去掉前导零。
      */
     fun parseItemDataXml(xml: String): List<PluItem> {
         val items = mutableListOf<PluItem>()
@@ -233,31 +237,48 @@ object MtScaleKeyXml {
             val block = m.groupValues[1]
             val pluNo = Regex("<PLU>(\\d+)</PLU>").find(block)?.groupValues?.get(1)?.toIntOrNull() ?: return@forEach
             val barcode = Regex("<AlternativeItemID>(.*?)</AlternativeItemID>", RegexOption.DOT_MATCHES_ALL)
-                .findAll(block).mapNotNull { it.groupValues[1].trim().toIntOrNull() }
+                .findAll(block).mapNotNull { it.groupValues[1].trim() }
+                .map { s -> if (s.matches(Regex("\\d+"))) s.trimStart('0').ifEmpty { "0" } else s }
                 .firstOrNull()
             fun description(type: String, language: String): String =
-                Regex("<Description[^>]*Type=\"$type\"[^>]*Language=\"$language\"[^>]*>(.*?)</Description>", RegexOption.DOT_MATCHES_ALL)
-                    .findAll(block).mapNotNull { it.groupValues[1].trim().takeIf { s -> s.isNotEmpty() } }
+                Regex("<Description\\b[^>]*>(.*?)</Description>", RegexOption.DOT_MATCHES_ALL)
+                    .findAll(block)
+                    .mapNotNull { dm ->
+                        val attrs = dm.value.substringBefore('>')
+                        val typeName = Regex("Type=\"([^\"]+)\"").find(attrs)?.groupValues?.get(1)
+                        // RL00 回收不带 Language 属性，视为请求的主语言
+                        val lang = Regex("Language=\"([^\"]+)\"").find(attrs)?.groupValues?.get(1) ?: language
+                        if (typeName == type && lang == language) {
+                            dm.groupValues[1].trim().takeIf { it.isNotEmpty() }
+                        } else {
+                            null
+                        }
+                    }
                     .firstOrNull().orEmpty()
             val name = description("ItemName", "zho")
             val nameEn = description("ItemName", "eng")
-            val priceMatch = Regex("<ItemPrice[^>]*UnitOfMeasureCode=\"(\\w+)\"[^>]*>([\\d.]+)</ItemPrice>").find(block)
+            val priceMatch = Regex("<ItemPrice[^>]*UnitOfMeasureCode=\"(\\w+)\"[^>]*>([\\d.]+)\\s*</ItemPrice>").find(block)
             val uom = priceMatch?.groupValues?.get(1) ?: "KGM"
             val priceText = priceMatch?.groupValues?.get(2) ?: "0"
             val minor = BigDecimal(priceText).movePointRight(2).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact()
             val labelFormat = Regex("<LabelFormatID[^>]*>(\\d+)</LabelFormatID>").find(block)?.groupValues?.get(1)?.toIntOrNull() ?: 1
-            val bestBefore = Regex("<Date[^>]*Type=\"BestBefore\"[^>]*>(\\d+)</Date>").find(block)?.groupValues?.get(1)?.toIntOrNull() ?: 0
-            val packedDate = Regex("<Date[^>]*Type=\"PackedDate\"[^>]*>(\\d+)</Date>").find(block)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            // 日期元素名可变（RL00 为 DateOffset），按 Type 属性匹配、到下一个 '<' 取数字
+            fun dateOffset(type: String): Int =
+                Regex("<Date\\w+[^>]*Type=\"$type\"[^>]*>(\\d+)\\s*<").find(block)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            val bestBefore = dateOffset("BestBefore")
+            val packedDate = dateOffset("PackedDate")
             val priceTag = Regex("<ItemPrice[^>]*>").find(block)?.value.orEmpty()
-            val allowMarkdown = priceTag.contains("PriceOverrideFlag=\"True\"", ignoreCase = true)
-            val allowDiscount = priceTag.contains("DiscountFlag=\"True\"", ignoreCase = true)
+            val allowMarkdown = priceTag.contains("PriceOverrideFlag=\"True\"", ignoreCase = true) ||
+                priceTag.contains("PriceOverrideFlag=\"true\"", ignoreCase = true)
+            val allowDiscount = priceTag.contains("DiscountFlag=\"True\"", ignoreCase = true) ||
+                priceTag.contains("DiscountFlag=\"true\"", ignoreCase = true)
             items += PluItem(
                 pluNo = pluNo,
                 name = name,
                 nameEn = nameEn,
                 weightFlag = if (uom == UOM_PCS) 1 else 0,
                 unitPrice = minor,
-                eanCode = barcode?.toString() ?: "",
+                eanCode = barcode ?: "",
                 usedByDate = bestBefore,
                 packedDate = packedDate,
                 allowMarkdown = allowMarkdown,
@@ -291,6 +312,8 @@ data class MtScaleResult(
     val percent: Int,
     val failedCommandIds: List<String>,
 ) {
-    /** Success 且状态 Complete 判定成功；其余失败。 */
-    val ok: Boolean get() = returnCode == "Success" && (status == "Complete" || status == "Output" || status == "Executing")
+    /** ReturnCode OK/Success 且状态 Complete/Output/Executing 判定成功（真机 RL00 返回 OK）。 */
+    val ok: Boolean
+        get() = returnCode in setOf("Success", "OK") &&
+            (status == "Complete" || status == "Output" || status == "Executing")
 }

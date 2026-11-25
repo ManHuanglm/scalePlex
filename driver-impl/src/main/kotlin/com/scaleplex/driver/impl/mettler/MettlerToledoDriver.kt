@@ -221,7 +221,7 @@ class MettlerToledoDriver(
         files.forEach { (name, content) ->
             File(taskDir, name).writeText(content, Charsets.UTF_8)
         }
-        log.info("MT task {} -> {}", taskId, taskDir.absolutePath)
+        log.info("MT task {} -> {} device={} model={} ip={}", taskId, taskDir.absolutePath, device.name, device.model, device.ip)
         val resultFile = MtScaleKeyBridge.executeTask(taskDir, taskId).getOrElse { return Result.failure(IllegalStateException(it.message)) }
         return Result.success(MtScaleKeyBridge.parseResult(resultFile, listOf(device), total))
     }

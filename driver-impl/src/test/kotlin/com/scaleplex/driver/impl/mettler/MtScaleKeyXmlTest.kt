@@ -90,29 +90,30 @@ class MtScaleKeyXmlTest {
 
     @Test
     fun `task result parser maps scale status to results`() {
+        // 真机 RL00 结果字段：TaskStatus（非 Status）、ReturnCode 为 OK/Success
         val resultXml = """
             <?xml version="1.0" encoding="utf-8"?>
             <MTTaskResult>
               <ScaleResult>
                 <DeviceID>7</DeviceID>
-                <ReturnCode>Success</ReturnCode>
-                <Status>Complete</Status>
-                <Percent>100</Percent>
+                <ReturnCode>OK</ReturnCode>
+                <TaskStatus>Complete</TaskStatus>
+                <ProcessPercent>100</ProcessPercent>
                 <CommandResults>
-                  <CommandResult><CommandID>c1</CommandID><ReturnCode>Success</ReturnCode></CommandResult>
+                  <CommandResult><CommandID>c1</CommandID><ReturnCode>OK</ReturnCode></CommandResult>
                 </CommandResults>
               </ScaleResult>
               <ScaleResult>
                 <DeviceID>8</DeviceID>
                 <ReturnCode>ConnectError</ReturnCode>
-                <Status>Error</Status>
-                <Percent>0</Percent>
+                <TaskStatus>Error</TaskStatus>
+                <ProcessPercent>0</ProcessPercent>
               </ScaleResult>
             </MTTaskResult>
         """.trimIndent()
         val results = MtScaleKeyXml.parseTaskResultXml(resultXml)
         assertEquals(2, results.size)
-        assertEquals("Success", results[7L]?.returnCode)
+        assertEquals("OK", results[7L]?.returnCode)
         assertTrue(results[7L]!!.ok)
         assertTrue(!results[8L]!!.ok)
         assertEquals("ConnectError", results[8L]?.returnCode)
