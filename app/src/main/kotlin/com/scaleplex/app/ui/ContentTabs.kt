@@ -134,3 +134,8 @@ fun deviceAddress(device: ScaleDevice): String = if (device.commType == CommType
 } else {
     "${device.commType} ${device.ip}:${device.port}"
 }
+
+/** 秤号显示：网络秤取 IP 尾段（与 ScaleKey 秤号一致），串口秤取串口名。 */
+fun scaleNoOf(device: ScaleDevice): String =
+    if (device.commType == CommType.SERIAL) device.serial.portName
+    else device.ip.substringAfterLast('.').ifBlank { "-" }

@@ -283,11 +283,6 @@ private fun deviceHeaders(): List<String> = listOf(
     tr("common.actions"),
 )
 
-/** 设备行"秤号"：网络秤取 IP 尾段（与 ScaleKey 秤号一致），串口秤取串口名。 */
-private fun scaleNo(d: ScaleDevice): String =
-    if (d.commType == CommType.SERIAL) d.serial.portName
-    else d.ip.substringAfterLast('.').ifBlank { "-" }
-
 @Composable
 private fun DeviceTableRow(
     table: com.scaleplex.app.ui.table.TableState,
@@ -319,7 +314,7 @@ private fun DeviceTableRow(
                 Spacer(Modifier.width(6.dp))
                 Text(statusLabel(status), fontSize = 11.sp, maxLines = 1)
             }
-            2 -> Text(scaleNo(d), Modifier.cellPadding(), fontSize = 11.sp, maxLines = 1)
+            2 -> Text(scaleNoOf(d), Modifier.cellPadding(), fontSize = 11.sp, maxLines = 1)
             3 -> Text(d.ip, Modifier.cellPadding(), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             4 -> Text(d.port.toString(), Modifier.cellPadding(), fontSize = 11.sp, maxLines = 1)
             5 -> Text(d.brand.displayName, Modifier.cellPadding(), fontSize = 11.sp, maxLines = 1)

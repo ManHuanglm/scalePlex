@@ -17,7 +17,8 @@ import androidx.compose.ui.unit.dp
 import com.scaleplex.app.AppState
 
 /**
- * 根布局：顶部应用栏 + 标签导航，左侧设备状态侧边栏，右侧内容区，底部状态栏。
+ * 根布局（Scale Manager 风格）：顶部应用栏 + 大图标工具栏（RibbonBar），
+ * 左侧电子秤列表（ScaleListPanel），右侧内容区，底部状态栏。
  * 窗口变窄时由各面板内部滚动条保证内容可达。
  */
 @Composable
@@ -26,8 +27,9 @@ fun ScalePlexApp(state: AppState) {
 
     Column(modifier = Modifier.fillMaxSize()) {
         MenuBar(state, refresh)
+        RibbonBar(state, refresh)
         Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            DeviceTree(
+            ScaleListPanel(
                 state = state,
                 modifier = Modifier.width(UiDimens.SidebarWidth).fillMaxHeight(),
                 refresh = refresh,
