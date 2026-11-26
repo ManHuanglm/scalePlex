@@ -36,8 +36,9 @@ import java.net.Socket
  * 4. 大华：TCP 4001 任意应答（友声帧未命中时兜底）；
  * 5. 托利多：TCP 3001 预检 + ScaleKey CheckOnline（按 ScaleType 候选逐个尝试）；
  * 6. 顶尖：AclasSDK GetDevicesInfo（设备名即型号）；
- * 7. 辉宏：UDP 1111 状态帧 ACK（协议待真机校准，尽力探测）；
- * 8. 寺冈 8442 族：TWS.exe RDR（秤号候选 = IP 尾段 / 1，最后手段）。
+ * 7. 凯士：TCP 20304 端口指纹（CAS 默认端口，CL 族私有协议无公开规范，暂以端口识别）；
+ * 8. 辉宏：UDP 1111 状态帧 ACK（协议待真机校准，尽力探测）；
+ * 9. 寺冈 8442 族：TWS.exe RDR（秤号候选 = IP 尾段 / 1，最后手段）。
  *
  * 全部未命中返回 null（设备离线、端口未开放或外部工具未配置）。
  */
@@ -66,6 +67,9 @@ object ScaleAutoDetector {
     /** 寺冈 ETP 族 FTP 端口。 */
     private const val DIGI_ETP_FTP_PORT = 21
 
+    /** 凯士 CAS 默认端口（CL 族条码秤 TCP 监听端口，真机校准 2026-11-26）。 */
+    private const val CAS_DEFAULT_PORT = 20304
+
     /**
      * 托利多 ScaleType 候选（真机校准：b 族 bCom/bComS/bPlus 三值 CheckOnline 互通，
      * RL00 终端必须 RL00，8442 族必须 8442；b 族具体型号无法从探测区分）。
@@ -85,6 +89,7 @@ object ScaleAutoDetector {
                 MT_DEFAULT_PORT,
                 ACLAS_DEFAULT_PORT,
                 DAHUA_YOUSHENG_PORT,
+                CAS_DEFAULT_PORT,
                 2000 + lastSegment,
             ),
         )
@@ -95,6 +100,7 @@ object ScaleAutoDetector {
             ?: detectYouShengOrDahua(trimmed, ports)
             ?: detectMettler(trimmed, ports)
             ?: detectAclas(trimmed, ports)
+            ?: detectCas(trimmed, ports)
             ?: detectHiHong(trimmed)
             ?: detectDigi8442(trimmed)
     }
@@ -177,6 +183,15 @@ object ScaleAutoDetector {
         if (status?.online != true) return null
         val model = status.model.takeIf { it.isNotBlank() && it != "ACLAS" } ?: ""
         return ScaleDetection(ScaleBrand.DINGTOP, model, ACLAS_DEFAULT_PORT, CommType.TCP, "AclasSDK 设备探测")
+    }
+
+    /** 凯士：TCP 20304 端口指纹（CL 族私有协议无公开规范，暂以端口识别品牌）。 */
+    private suspend fun detectCas(ip: String, openPorts: Set<Int>): ScaleDetection? {
+        if (CAS_DEFAULT_PORT !in openPorts) return null
+        return ScaleDetection(
+            ScaleBrand.CAS, "", CAS_DEFAULT_PORT, CommType.TCP,
+            "TCP 20304 端口开放（CAS 默认端口）",
+        )
     }
 
     /** 辉宏：UDP 状态帧 ACK（协议待真机校准，尽力探测）。 */
