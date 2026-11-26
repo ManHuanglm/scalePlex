@@ -3,7 +3,7 @@ package com.scaleplex.app.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,9 +54,9 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                     )
                     DropdownMenu(brandExpanded, { brandExpanded = false }) {
                         com.scaleplex.core.model.ScaleBrand.entries.forEach { b ->
-                            DropdownMenuItem(onClick = { brand = b; brandExpanded = false }) {
+                            DropdownMenuItem(onClick = { brand = b; brandExpanded = false }, text = {
                                 Text(b.displayName)
-                            }
+                            })
                         }
                     }
                 }
@@ -73,12 +73,12 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                     )
                     DropdownMenu(catExpanded, { catExpanded = false }) {
                         categories.forEach { cat ->
-                            DropdownMenuItem(onClick = { plu = plu.copy(mainGroup = cat.no); catExpanded = false }) {
+                            DropdownMenuItem(onClick = { plu = plu.copy(mainGroup = cat.no); catExpanded = false }, text = {
                                 Text("${cat.no} ${cat.name}")
-                            }
+                            })
                         }
                         if (categories.isEmpty()) {
-                            DropdownMenuItem(onClick = { catExpanded = false }) { Text(tr("category.empty")) }
+                            DropdownMenuItem(onClick = { catExpanded = false }, text = { Text(tr("category.empty")) })
                         }
                     }
                     Field(tr("plu.field.no"), plu.pluNo.toString(), Modifier.width(110.dp)) { s ->
@@ -117,7 +117,7 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                         com.scaleplex.core.model.ShelfLifeUnit.entries.forEach { u ->
                             DropdownMenuItem(onClick = {
                                 plu = plu.copy(shelfLifeUnit = u.id); shelfUnitExpanded = false
-                            }) { Text(u.label) }
+                            }, text = { Text(u.label) })
                         }
                     }
                 }
@@ -133,8 +133,8 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                         trailingIcon = { TextButton(onClick = { typeExpanded = true }) { Text("▾") } },
                     )
                     DropdownMenu(typeExpanded, { typeExpanded = false }) {
-                        DropdownMenuItem(onClick = { plu = plu.copy(weightFlag = 0); typeExpanded = false }) { Text(tr("plu.weight.weigh")) }
-                        DropdownMenuItem(onClick = { plu = plu.copy(weightFlag = 1); typeExpanded = false }) { Text(tr("plu.weight.count")) }
+                        DropdownMenuItem(onClick = { plu = plu.copy(weightFlag = 0); typeExpanded = false }, text = { Text(tr("plu.weight.weigh")) })
+                        DropdownMenuItem(onClick = { plu = plu.copy(weightFlag = 1); typeExpanded = false }, text = { Text(tr("plu.weight.count")) })
                     }
                     Spacer(Modifier.width(16.dp))
                     Text(tr("plu.unit"), Modifier.width(80.dp))
@@ -150,7 +150,7 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                                 // 计数(PCS) 与 计件 标志联动
                                 plu = plu.copy(unit = u.id, weightFlag = if (u == com.scaleplex.core.model.PluUnit.PCS) 1 else 0)
                                 unitExpanded = false
-                            }) { Text(u.label) }
+                            }, text = { Text(u.label) })
                         }
                     }
                 }
@@ -224,11 +224,11 @@ fun PluEditorDialog(state: AppState, initial: PluItem, onDismiss: () -> Unit, on
                         DropdownMenuItem(onClick = {
                             plu = plu.copy(packedDateUnit = 0)
                             packedUnitExpanded = false
-                        }) { Text(tr("plu.mt.unit.day")) }
+                        }, text = { Text(tr("plu.mt.unit.day")) })
                         DropdownMenuItem(onClick = {
                             plu = plu.copy(packedDateUnit = 1)
                             packedUnitExpanded = false
-                        }) { Text(tr("plu.mt.unit.month")) }
+                        }, text = { Text(tr("plu.mt.unit.month")) })
                     }
                     CheckField(tr("plu.mt.printPacked"), plu.printPackedDate) {
                         plu = plu.copy(printPackedDate = it)
@@ -331,9 +331,9 @@ private fun TableDropdownField(
     )
     DropdownMenu(expanded, { expanded = false }) {
         options.forEach { (no, name) ->
-            DropdownMenuItem(onClick = { onSelect(no); expanded = false }) {
+            DropdownMenuItem(onClick = { onSelect(no); expanded = false }, text = {
                 Text("$no · $name")
-            }
+            })
         }
     }
 }

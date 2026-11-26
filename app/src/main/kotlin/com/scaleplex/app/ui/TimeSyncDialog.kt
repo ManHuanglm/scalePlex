@@ -8,13 +8,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.AlertDialog
-import androidx.compose.material.Button
-import androidx.compose.material.Checkbox
-import androidx.compose.material.Divider
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedButton
-import androidx.compose.material.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,10 +37,10 @@ import com.scaleplex.app.ui.table.cellPadding
 import com.scaleplex.app.ui.table.rememberTableState
 import com.scaleplex.core.i18n.tr
 import com.scaleplex.core.model.DeviceStatus
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * 时间同步对话框（设备管理同款表格布局）：勾选单台或多台秤后可
@@ -118,7 +118,7 @@ fun TimeSyncDialog(state: AppState, onDismiss: () -> Unit) {
                         val d = devices[i]
                         val status = state.deviceRuntimes[d.id]?.status ?: DeviceStatus.UNKNOWN
                         val result = results[d.id]
-                        TableRow(table, modifier = Modifier.background(MaterialTheme.colors.surface)) { index, _ ->
+                        TableRow(table, modifier = Modifier.background(MaterialTheme.colorScheme.surface)) { index, _ ->
                             when (index) {
                                 0 -> Checkbox(
                                     checked = checked.contains(d.id),
@@ -141,14 +141,14 @@ fun TimeSyncDialog(state: AppState, onDismiss: () -> Unit) {
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     color = when {
-                                        result == null -> MaterialTheme.colors.onSurface.copy(alpha = 0.5f)
+                                        result == null -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                         result.first -> UiColors.Success
                                         else -> UiColors.Error
                                     },
                                 )
                             }
                         }
-                        Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.08f))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                     }
                 }
 
@@ -211,7 +211,7 @@ fun TimeSyncDialog(state: AppState, onDismiss: () -> Unit) {
                     }) { Text(tr("timeSync.write"), fontSize = 12.sp) }
                     Spacer(Modifier.weight(1f))
                     summary?.let {
-                        Text(it, fontSize = 11.sp, color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f))
+                        Text(it, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
                     }
                 }
             }

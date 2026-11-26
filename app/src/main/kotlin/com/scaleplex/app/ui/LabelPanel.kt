@@ -10,14 +10,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.Button
-import androidx.compose.material.Divider
-import androidx.compose.material.DropdownMenu
-import androidx.compose.material.DropdownMenuItem
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedButton
-import androidx.compose.material.Text
-import androidx.compose.material.TextButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -98,7 +98,7 @@ fun LabelPanel(state: AppState, refresh: MutableState<Int>) {
                             )
                             newExpanded = false
                             refresh.value++
-                        }) { Text(tr("label.system." + system.name)) }
+                        }, text = { Text(tr("label.system." + system.name)) })
                     }
                 }
             }
@@ -140,7 +140,7 @@ fun LabelPanel(state: AppState, refresh: MutableState<Int>) {
                             refresh.value++
                         },
                     )
-                    Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.08f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                 }
             }
             if (templates.isEmpty()) {
@@ -148,7 +148,7 @@ fun LabelPanel(state: AppState, refresh: MutableState<Int>) {
                     tr("label.empty"),
                     modifier = Modifier.align(Alignment.Center),
                     fontSize = 12.sp,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                 )
             }
         }
@@ -184,7 +184,7 @@ private fun LabelTableRow(
         table,
         modifier = Modifier
             .background(
-                if (hovered) MaterialTheme.colors.primary.copy(alpha = 0.06f)
+                if (hovered) MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)
                 else Color.Transparent,
             )
             .hoverable(hoverSource),

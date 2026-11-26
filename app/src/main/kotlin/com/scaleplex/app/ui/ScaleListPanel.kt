@@ -16,15 +16,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.Divider
-import androidx.compose.material.Icon
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
-import androidx.compose.material.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -60,7 +60,7 @@ fun ScaleListPanel(state: AppState, modifier: Modifier = Modifier, refresh: Muta
 
     val online = state.deviceRuntimes.values.count { it.status == DeviceStatus.ONLINE }
 
-    Surface(modifier = modifier, color = MaterialTheme.colors.surface) {
+    Surface(modifier = modifier, color = MaterialTheme.colorScheme.surface) {
         Column(modifier = Modifier.fillMaxSize()) {
             // ---- 标题行：电子秤列表 + 新建 / 删除 ----
             Row(
@@ -91,7 +91,7 @@ fun ScaleListPanel(state: AppState, modifier: Modifier = Modifier, refresh: Muta
                     Text(tr("device.delete"), fontSize = 11.sp, color = UiColors.Error)
                 }
             }
-            Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
 
             // ---- 秤列表（状态图标 · 秤号 · IP） ----
             val listState = rememberLazyListState()
@@ -105,7 +105,7 @@ fun ScaleListPanel(state: AppState, modifier: Modifier = Modifier, refresh: Muta
                                 .fillMaxWidth()
                                 .background(
                                     when {
-                                        selected -> MaterialTheme.colors.primary.copy(alpha = 0.16f)
+                                        selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
                                         else -> Color.Transparent
                                     },
                                 )
@@ -130,12 +130,12 @@ fun ScaleListPanel(state: AppState, modifier: Modifier = Modifier, refresh: Muta
                             Text(
                                 d.ip,
                                 fontSize = 12.sp,
-                                color = MaterialTheme.colors.onSurface.copy(alpha = 0.75f),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.06f))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
                     }
                 }
                 if (devices.isEmpty()) {
@@ -143,13 +143,13 @@ fun ScaleListPanel(state: AppState, modifier: Modifier = Modifier, refresh: Muta
                         tr("device.emptyHint"),
                         modifier = Modifier.align(Alignment.Center).padding(12.dp),
                         fontSize = 11.sp,
-                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     )
                 }
             }
 
             // ---- 底部统计：在线数 / 总数 ----
-            Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -157,13 +157,13 @@ fun ScaleListPanel(state: AppState, modifier: Modifier = Modifier, refresh: Muta
                 Text(
                     "${tr("sidebar.onlineCount")}${tr("common.count")}：$online",
                     fontSize = 11.sp,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.65f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
                 )
                 Spacer(Modifier.width(14.dp))
                 Text(
                     "${tr("sidebar.totalCount")}${tr("common.count")}：${devices.size}",
                     fontSize = 11.sp,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.65f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
                 )
             }
         }

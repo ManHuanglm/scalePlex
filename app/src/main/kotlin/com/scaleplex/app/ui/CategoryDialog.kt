@@ -3,7 +3,7 @@ package com.scaleplex.app.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +60,7 @@ fun CategoryDialog(state: AppState, onDismiss: () -> Unit) {
                     Text(message, fontSize = 11.sp, color = UiColors.Error, modifier = Modifier.padding(top = 4.dp))
                 }
                 Spacer(Modifier.height(8.dp))
-                Divider()
+                HorizontalDivider()
                 // ---- 类别列表 ----
                 LazyColumn(modifier = Modifier.weight(1f).heightIn(min = 180.dp)) {
                     items(categories, key = { it.no }) { cat ->
@@ -78,14 +78,14 @@ fun CategoryDialog(state: AppState, onDismiss: () -> Unit) {
                                 reload()
                             }) { Text(tr("plu.delete"), fontSize = 12.sp, color = UiColors.Error) }
                         }
-                        Divider()
+                        HorizontalDivider()
                     }
                 }
                 if (categories.isEmpty()) {
                     Text(
                         tr("category.empty"),
                         fontSize = 12.sp,
-                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         modifier = Modifier.padding(8.dp),
                     )
                 }

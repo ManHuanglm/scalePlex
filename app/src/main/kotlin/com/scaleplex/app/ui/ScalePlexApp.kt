@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.MaterialTheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,7 +38,7 @@ fun ScalePlexApp(state: AppState) {
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(1.dp)
-                    .background(MaterialTheme.colors.onSurface.copy(alpha = 0.12f)),
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
             )
             ContentTabs(state, refresh, Modifier.weight(1f))
         }

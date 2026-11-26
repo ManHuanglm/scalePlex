@@ -19,17 +19,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.AlertDialog
-import androidx.compose.material.Button
-import androidx.compose.material.Checkbox
-import androidx.compose.material.Divider
-import androidx.compose.material.DropdownMenu
-import androidx.compose.material.DropdownMenuItem
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedButton
-import androidx.compose.material.OutlinedTextField
-import androidx.compose.material.Text
-import androidx.compose.material.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -77,12 +77,12 @@ import com.scaleplex.core.model.ShelfLifeUnit
 import com.scaleplex.core.util.Numbers
 import com.scaleplex.db.dao.PluDao
 import com.scaleplex.service.io.ImportExportService
-import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import javax.swing.JFileChooser
+import kotlinx.coroutines.launch
 
 /**
  * PLU 管理面板（界面功能对齐顶尖 LiNK64 商品资料）：
@@ -193,9 +193,9 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
                         PluDao.FIELD_ALL, PluDao.FIELD_BARCODE, PluDao.FIELD_PLU,
                         PluDao.FIELD_NAME, PluDao.FIELD_CATEGORY,
                     ).forEach { f ->
-                        DropdownMenuItem(onClick = { filterField = f; fieldExpanded = false }) {
+                        DropdownMenuItem(onClick = { filterField = f; fieldExpanded = false }, text = {
                             Text(filterFieldLabel(f))
-                        }
+                        })
                     }
                 }
             }
@@ -219,13 +219,13 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
                     Text("▾", fontSize = 10.sp)
                 }
                 DropdownMenu(catExpanded, { catExpanded = false }) {
-                    DropdownMenuItem(onClick = { categoryFilter = null; catExpanded = false }) {
+                    DropdownMenuItem(onClick = { categoryFilter = null; catExpanded = false }, text = {
                         Text(tr("plu.filterDept"))
-                    }
+                    })
                     categories.forEach { cat ->
-                        DropdownMenuItem(onClick = { categoryFilter = cat.no; catExpanded = false }) {
+                        DropdownMenuItem(onClick = { categoryFilter = cat.no; catExpanded = false }, text = {
                             Text("${cat.no} ${cat.name}")
-                        }
+                        })
                     }
                 }
             }
@@ -289,7 +289,7 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
             Text(
                 tr("plu.inlineHint"),
                 fontSize = 11.sp,
-                color = MaterialTheme.colors.onSurface.copy(alpha = 0.55f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
             )
             if (inlineMessage.isNotBlank()) {
                 Spacer(Modifier.width(12.dp))
@@ -331,8 +331,8 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
                         modifier = Modifier
                             .background(
                                 when {
-                                    selectedPluNo == p.pluNo -> MaterialTheme.colors.primary.copy(alpha = 0.10f)
-                                    hovered -> MaterialTheme.colors.primary.copy(alpha = 0.06f)
+                                    selectedPluNo == p.pluNo -> MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                                    hovered -> MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)
                                     else -> Color.Transparent
                                 },
                             )
@@ -396,7 +396,7 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
                             )
                         }
                     }
-                    Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.08f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                 }
             }
             if (plus.isEmpty()) {
@@ -404,7 +404,7 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
                     tr("plu.empty"),
                     modifier = Modifier.align(Alignment.Center),
                     fontSize = 12.sp,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                 )
             }
         }
@@ -621,13 +621,13 @@ private fun InlineCellEditor(initial: String, onCommit: (String) -> Unit, onCanc
         value = text,
         onValueChange = { text = it },
         singleLine = true,
-        textStyle = TextStyle(fontSize = 12.sp, color = MaterialTheme.colors.onSurface),
-        cursorBrush = SolidColor(MaterialTheme.colors.primary),
+        textStyle = TextStyle(fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp, vertical = 3.dp)
-            .border(1.dp, MaterialTheme.colors.primary, RoundedCornerShape(2.dp))
-            .background(MaterialTheme.colors.surface)
+            .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))
+            .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 6.dp, vertical = 5.dp)
             .focusRequester(focusRequester)
             .onFocusChanged { state ->
@@ -719,7 +719,7 @@ private fun RecallDevicesDialog(state: AppState, onDismiss: () -> Unit, onDone: 
                         Text(
                             tr("plu.recall.empty"),
                             fontSize = 12.sp,
-                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                             modifier = Modifier.padding(vertical = 12.dp),
                         )
                     } else {
@@ -745,7 +745,7 @@ private fun RecallDevicesDialog(state: AppState, onDismiss: () -> Unit, onDone: 
                         Text(
                             message,
                             fontSize = 12.sp,
-                            color = if (busy) MaterialTheme.colors.onSurface.copy(alpha = 0.6f) else UiColors.Success,
+                            color = if (busy) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f) else UiColors.Success,
                             modifier = Modifier.padding(top = 10.dp),
                         )
                     }
@@ -792,7 +792,7 @@ private fun RecallResultView(state: AppState, outcome: RecallOutcome) {
             Text(
                 tr("plu.recall.noneScale"),
                 fontSize = 12.sp,
-                color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 modifier = Modifier.padding(vertical = 12.dp),
             )
         }
@@ -802,7 +802,7 @@ private fun RecallResultView(state: AppState, outcome: RecallOutcome) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.colors.primary.copy(alpha = 0.08f))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
                     .clickable { expanded[dev.id] = !open }
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -819,7 +819,7 @@ private fun RecallResultView(state: AppState, outcome: RecallOutcome) {
                 Text(
                     "${items.size}${tr("common.count")}",
                     fontSize = 11.sp,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 )
             }
             if (open) {
@@ -827,7 +827,7 @@ private fun RecallResultView(state: AppState, outcome: RecallOutcome) {
                     Text(
                         tr("plu.recall.noneScale"),
                         fontSize = 12.sp,
-                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.55f),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
                         modifier = Modifier.padding(start = 24.dp, top = 4.dp, bottom = 4.dp),
                     )
                 } else {
@@ -890,12 +890,12 @@ private fun DevicePickRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(4.dp))
-            .background(if (selected) MaterialTheme.colors.primary.copy(alpha = 0.10f) else Color.Transparent)
+            .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f) else Color.Transparent)
             .clickable(enabled = enabled, onClick = onSelect)
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        androidx.compose.material.RadioButton(selected = selected, onClick = onSelect, enabled = enabled)
+        androidx.compose.material3.RadioButton(selected = selected, onClick = onSelect, enabled = enabled)
         if (status != null) {
             StatusDot(status)
             Spacer(Modifier.width(6.dp))
@@ -905,7 +905,7 @@ private fun DevicePickRow(
         Text(
             detail,
             fontSize = 11.sp,
-            color = MaterialTheme.colors.onSurface.copy(alpha = 0.55f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

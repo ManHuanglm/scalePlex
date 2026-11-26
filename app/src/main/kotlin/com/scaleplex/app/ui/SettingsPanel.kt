@@ -17,18 +17,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.AlertDialog
-import androidx.compose.material.Button
-import androidx.compose.material.Divider
-import androidx.compose.material.DropdownMenu
-import androidx.compose.material.DropdownMenuItem
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedButton
-import androidx.compose.material.OutlinedTextField
-import androidx.compose.material.Surface
-import androidx.compose.material.Switch
-import androidx.compose.material.Text
-import androidx.compose.material.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -131,7 +131,7 @@ fun SettingsPanel(state: AppState, refresh: MutableState<Int>) {
                                     DropdownMenuItem(onClick = {
                                         cfg = cfg.copy(heartbeatIntervalMs = ms)
                                         hbExpanded = false
-                                    }) { Text(hbLabel(ms)) }
+                                    }, text = { Text(hbLabel(ms)) })
                                 }
                             }
                         }
@@ -188,7 +188,7 @@ fun SettingsPanel(state: AppState, refresh: MutableState<Int>) {
                                         applyMessage = tr("settings.applyDone") + n
                                         formatExpanded = false
                                         refresh.value++
-                                    }) { Text("$no · $name") }
+                                    }, text = { Text("$no · $name") })
                                 }
                             }
                         }
@@ -292,9 +292,8 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colors.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.12f)),
-        elevation = 0.dp,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
@@ -304,9 +303,9 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
                 title,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colors.primary,
+                color = MaterialTheme.colorScheme.primary,
             )
-            Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
             content()
         }
     }
@@ -320,7 +319,7 @@ private fun SettingRow(label: String, content: @Composable RowScope.() -> Unit) 
             label,
             modifier = Modifier.width(LABEL_WIDTH),
             fontSize = 13.sp,
-            color = MaterialTheme.colors.onSurface.copy(alpha = 0.85f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
         )
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -355,7 +354,7 @@ private fun ToolDirRow(
             label,
             modifier = Modifier.width(LABEL_WIDTH),
             fontSize = 13.sp,
-            color = MaterialTheme.colors.onSurface.copy(alpha = 0.85f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
         )
         OutlinedTextField(
             value = value,

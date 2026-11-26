@@ -1,14 +1,15 @@
 package com.scaleplex.app.ui
 
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
-import androidx.compose.material.TextButton
-import androidx.compose.material.TopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scaleplex.app.AppState
 import com.scaleplex.core.i18n.tr
@@ -17,6 +18,7 @@ import com.scaleplex.core.model.DeviceStatus
 /**
  * 顶部应用栏：标题 / 在线统计 / 语言切换（页面导航由 RibbonBar 大图标工具栏承担）。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MenuBar(state: AppState, refresh: MutableState<Int>) {
     val online = state.deviceRuntimes.values.count { it.status == DeviceStatus.ONLINE }
@@ -50,8 +52,10 @@ fun MenuBar(state: AppState, refresh: MutableState<Int>) {
                 )
             }
         },
-        backgroundColor = MaterialTheme.colors.primary,
-        contentColor = Color.White,
-        elevation = 2.dp,
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            titleContentColor = Color.White,
+            actionIconContentColor = Color.White,
+        ),
     )
 }

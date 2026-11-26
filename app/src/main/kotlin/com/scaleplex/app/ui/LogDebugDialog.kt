@@ -14,17 +14,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.AlertDialog
-import androidx.compose.material.Button
-import androidx.compose.material.DropdownMenu
-import androidx.compose.material.DropdownMenuItem
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedButton
-import androidx.compose.material.OutlinedTextField
-import androidx.compose.material.Tab
-import androidx.compose.material.TabRow
-import androidx.compose.material.Text
-import androidx.compose.material.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -61,7 +61,7 @@ fun LogDebugDialog(state: AppState, onDismiss: () -> Unit) {
         title = { Text(tr("log.title")) },
         text = {
             Column(modifier = Modifier.width(760.dp)) {
-                TabRow(selectedTabIndex = tab, backgroundColor = MaterialTheme.colors.surface) {
+                TabRow(selectedTabIndex = tab, containerColor = MaterialTheme.colorScheme.surface) {
                     Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(tr("log.tab.file")) })
                     Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(tr("log.tab.packet")) })
                 }
@@ -121,9 +121,9 @@ private fun LogFilterBar(
             }
             DropdownMenu(levelExpanded, { levelExpanded = false }) {
                 listOf("ALL", "ERROR", "WARN", "INFO", "DEBUG").forEach { lv ->
-                    DropdownMenuItem(onClick = { onLevel(lv); levelExpanded = false }) {
+                    DropdownMenuItem(onClick = { onLevel(lv); levelExpanded = false }, text = {
                         Text(levelFilterLabel(lv))
-                    }
+                    })
                 }
             }
         }
@@ -139,13 +139,13 @@ private fun LogFilterBar(
                 )
             }
             DropdownMenu(deviceExpanded, { deviceExpanded = false }) {
-                DropdownMenuItem(onClick = { onDevice(null); deviceExpanded = false }) {
+                DropdownMenuItem(onClick = { onDevice(null); deviceExpanded = false }, text = {
                     Text(tr("log.filter.all"))
-                }
+                })
                 devices.forEach { d ->
-                    DropdownMenuItem(onClick = { onDevice(d); deviceExpanded = false }) {
+                    DropdownMenuItem(onClick = { onDevice(d); deviceExpanded = false }, text = {
                         Text("${d.name} · ${d.brand.displayName} · ${d.model} · ${d.ip}")
-                    }
+                    })
                 }
             }
         }
@@ -200,7 +200,7 @@ private fun FileLogView(devices: List<ScaleDevice>) {
             Text(
                 "${tr("log.filter.result")} ${filtered.size} / ${allLines.size}",
                 fontSize = 11.sp,
-                color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = { refreshTick++ }) { Text(tr("log.refresh")) }
@@ -233,13 +233,13 @@ private fun LogLinesView(lines: List<String>, refreshTick: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .height(360.dp)
-            .background(MaterialTheme.colors.onSurface.copy(alpha = 0.04f))
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
             .padding(6.dp),
         state = listState,
     ) {
         if (lines.isEmpty()) {
             item {
-                Text(tr("log.file.missing"), fontSize = 12.sp, color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f))
+                Text(tr("log.file.missing"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
             }
         }
         items(lines) { line ->
@@ -247,7 +247,7 @@ private fun LogLinesView(lines: List<String>, refreshTick: Int) {
                 line,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
-                color = levelColor(line, MaterialTheme.colors.onSurface),
+                color = levelColor(line, MaterialTheme.colorScheme.onSurface),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -280,7 +280,7 @@ private fun PacketView(state: AppState, devices: List<ScaleDevice>) {
             Text(
                 "${tr("log.filter.result")} ${filtered.size} / ${packets.size}",
                 fontSize = 11.sp,
-                color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = { refreshTick++ }) { Text(tr("log.refresh")) }
@@ -293,13 +293,13 @@ private fun PacketView(state: AppState, devices: List<ScaleDevice>) {
         modifier = Modifier
             .fillMaxWidth()
             .height(360.dp)
-            .background(MaterialTheme.colors.onSurface.copy(alpha = 0.04f))
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
             .padding(6.dp),
         state = listState,
     ) {
         if (filtered.isEmpty()) {
             item {
-                Text(tr("log.packet.none"), fontSize = 12.sp, color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f))
+                Text(tr("log.packet.none"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
             }
         }
         items(filtered) { p ->

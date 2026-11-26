@@ -8,14 +8,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.Button
-import androidx.compose.material.Divider
-import androidx.compose.material.DropdownMenu
-import androidx.compose.material.DropdownMenuItem
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedButton
-import androidx.compose.material.OutlinedTextField
-import androidx.compose.material.Text
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -41,9 +41,9 @@ import com.scaleplex.core.i18n.tr
 import com.scaleplex.core.model.TradeRecord
 import com.scaleplex.core.util.Numbers
 import com.scaleplex.service.io.ImportExportService
-import kotlinx.coroutines.launch
 import java.io.File
 import javax.swing.JFileChooser
+import kotlinx.coroutines.launch
 
 /**
  * 交易流水面板：按设备 / 起止日期 / PLU 号筛选查询，读取秤内流水、清空、导出 Excel。
@@ -119,13 +119,13 @@ fun TradePanel(state: AppState, refresh: MutableState<Int>) {
                     Text("▾", fontSize = 10.sp)
                 }
                 DropdownMenu(deviceExpanded, { deviceExpanded = false }) {
-                    DropdownMenuItem(onClick = { filterDevice = null; deviceExpanded = false }) {
+                    DropdownMenuItem(onClick = { filterDevice = null; deviceExpanded = false }, text = {
                         Text(tr("trade.filter.device"))
-                    }
+                    })
                     devices.forEach { d ->
-                        DropdownMenuItem(onClick = { filterDevice = d.id; deviceExpanded = false }) {
+                        DropdownMenuItem(onClick = { filterDevice = d.id; deviceExpanded = false }, text = {
                             Text(d.name)
-                        }
+                        })
                     }
                 }
             }
@@ -174,7 +174,7 @@ fun TradePanel(state: AppState, refresh: MutableState<Int>) {
                         deviceName = deviceNames[records[i].deviceId] ?: "-",
                         state = state,
                     )
-                    Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.08f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                 }
             }
             if (records.isEmpty()) {
@@ -182,7 +182,7 @@ fun TradePanel(state: AppState, refresh: MutableState<Int>) {
                     tr("trade.empty"),
                     modifier = Modifier.align(Alignment.Center),
                     fontSize = 12.sp,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                 )
             }
         }
@@ -210,7 +210,7 @@ private fun TradeTableRow(
         table,
         modifier = Modifier
             .background(
-                if (hovered) MaterialTheme.colors.primary.copy(alpha = 0.06f)
+                if (hovered) MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)
                 else Color.Transparent,
             )
             .hoverable(hoverSource),

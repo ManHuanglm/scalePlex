@@ -12,21 +12,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.AlertDialog
-import androidx.compose.material.Button
-import androidx.compose.material.Divider
-import androidx.compose.material.DropdownMenu
-import androidx.compose.material.DropdownMenuItem
-import androidx.compose.material.OutlinedButton
-import androidx.compose.material.OutlinedTextField
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
-import androidx.compose.material.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,9 +45,9 @@ import com.scaleplex.core.model.LabelFieldEntry
 import com.scaleplex.core.model.LabelSystem
 import com.scaleplex.core.model.LabelTemplate
 import com.scaleplex.core.model.LabelTemplateJson
-import kotlinx.coroutines.launch
 import java.io.File
 import javax.swing.JFileChooser
+import kotlinx.coroutines.launch
 
 private val ROTATION_OPTIONS = listOf(0, 90, 180, 270)
 
@@ -127,7 +127,7 @@ fun LabelEditorDialog(
                                     heightMm = if (keepSize) template.heightMm else system.defaultHeightMm,
                                 )
                                 systemExpanded = false
-                            }) { Text(tr("label.system." + system.name)) }
+                            }, text = { Text(tr("label.system." + system.name)) })
                         }
                     }
                     // 预设纸张尺寸（按标签体系给出常用规格）
@@ -140,7 +140,7 @@ fun LabelEditorDialog(
                             DropdownMenuItem(onClick = {
                                 template = template.copy(widthMm = size.first, heightMm = size.second)
                                 presetExpanded = false
-                            }) { Text("${size.first}×${size.second}") }
+                            }, text = { Text("${size.first}×${size.second}") })
                         }
                     }
                     OutlinedTextField(
@@ -188,7 +188,7 @@ fun LabelEditorDialog(
                     Spacer(Modifier.weight(1f))
                     OutlinedButton(onClick = onDismiss) { Text(tr("common.close")) }
                 }
-                Divider()
+                HorizontalDivider()
 
                 // ---- 三栏主体 ----
                 Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -326,7 +326,7 @@ private fun PaletteColumn(system: LabelSystem, onAdd: (LabelFieldEntry) -> Unit)
                 Text(tr(entry.labelKey))
             }
         }
-        Divider(Modifier.padding(vertical = 6.dp))
+        HorizontalDivider(Modifier.padding(vertical = 6.dp))
         Text(tr("label.shapes"), fontSize = 13.sp, color = Color(0xFF1E88E5))
         system.shapeKinds.forEach { kind ->
             Button(
@@ -359,7 +359,7 @@ private fun PropertyPanel(
         InfoRow(tr("label.formatNo"), if (template.id > 0) template.id.toString() else "-")
         InfoRow(tr("label.width"), "${template.widthMm} (mm) · ${dotCount(template.widthMm, template.system)} (Dot)")
         InfoRow(tr("label.height"), "${template.heightMm} (mm) · ${dotCount(template.heightMm, template.system)} (Dot)")
-        Divider(Modifier.padding(vertical = 4.dp))
+        HorizontalDivider(Modifier.padding(vertical = 4.dp))
 
         Text(tr("label.properties"), fontSize = 13.sp, color = Color(0xFF1E88E5))
         if (element == null) {
@@ -386,9 +386,9 @@ private fun PropertyPanel(
             trailingIcon = { TextButton(onClick = { fontExpanded = true }) { Text("▾") } })
         DropdownMenu(fontExpanded, { fontExpanded = false }) {
             FONT_OPTIONS.forEach { font ->
-                DropdownMenuItem(onClick = { onUpdate(index, element.copy(fontName = font)); fontExpanded = false }) {
+                DropdownMenuItem(onClick = { onUpdate(index, element.copy(fontName = font)); fontExpanded = false }, text = {
                     Text(font)
-                }
+                })
             }
         }
         NumField(tr("label.fontSize"), element.fontSizePt.toFloat(), Modifier.fillMaxWidth()) { v ->
@@ -408,9 +408,9 @@ private fun PropertyPanel(
             trailingIcon = { TextButton(onClick = { rotExpanded = true }) { Text("▾") } })
         DropdownMenu(rotExpanded, { rotExpanded = false }) {
             ROTATION_OPTIONS.forEach { r ->
-                DropdownMenuItem(onClick = { onUpdate(index, element.copy(rotation = r)); rotExpanded = false }) {
+                DropdownMenuItem(onClick = { onUpdate(index, element.copy(rotation = r)); rotExpanded = false }, text = {
                     Text(r.toString())
-                }
+                })
             }
         }
 

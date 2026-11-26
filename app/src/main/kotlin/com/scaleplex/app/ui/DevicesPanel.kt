@@ -13,17 +13,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.AlertDialog
-import androidx.compose.material.Button
-import androidx.compose.material.Checkbox
-import androidx.compose.material.Divider
-import androidx.compose.material.DropdownMenu
-import androidx.compose.material.DropdownMenuItem
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.OutlinedButton
-import androidx.compose.material.OutlinedTextField
-import androidx.compose.material.Text
-import androidx.compose.material.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -123,13 +123,13 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
                     Text("▾", fontSize = 10.sp)
                 }
                 DropdownMenu(filterExpanded, { filterExpanded = false }) {
-                    DropdownMenuItem(onClick = { groupFilter = null; filterExpanded = false }) {
+                    DropdownMenuItem(onClick = { groupFilter = null; filterExpanded = false }, text = {
                         Text(tr("group.all"))
-                    }
+                    })
                     groups.forEach { g ->
-                        DropdownMenuItem(onClick = { groupFilter = g.id; filterExpanded = false }) {
+                        DropdownMenuItem(onClick = { groupFilter = g.id; filterExpanded = false }, text = {
                             Text(g.name)
-                        }
+                        })
                     }
                 }
             }
@@ -159,7 +159,7 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
         Text(
             tr("device.batchHint"),
             fontSize = 11.sp,
-            color = MaterialTheme.colors.onSurface.copy(alpha = 0.55f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
             modifier = Modifier.padding(bottom = 8.dp),
         )
 
@@ -223,7 +223,7 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
                             }
                         },
                     )
-                    Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.08f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
                 }
             }
             if (devices.isEmpty()) {
@@ -231,7 +231,7 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
                     tr("device.emptyHint"),
                     modifier = Modifier.align(Alignment.Center),
                     fontSize = 12.sp,
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.5f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                 )
             }
         }
@@ -305,7 +305,7 @@ private fun DeviceTableRow(
         table,
         modifier = Modifier
             .background(
-                if (hovered) MaterialTheme.colors.primary.copy(alpha = 0.06f)
+                if (hovered) MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)
                 else Color.Transparent,
             )
             .hoverable(hoverSource)
@@ -468,7 +468,7 @@ private fun DeviceEditorDialog(
                             // 切换品牌时端口联动为该品牌默认端口（各品牌端口对照表；可手改）
                             dev = dev.copy(brand = b, port = b.defaultPort)
                             brandExpanded = false
-                        }) { Text(b.displayName) }
+                        }, text = { Text(b.displayName) })
                     }
                 }
 
@@ -496,7 +496,7 @@ private fun DeviceEditorDialog(
                                 DropdownMenuItem(onClick = {
                                     dev = dev.copy(model = model)
                                     modelExpanded = false
-                                }) { Text(model) }
+                                }, text = { Text(model) })
                             }
                         }
                     }
@@ -512,7 +512,7 @@ private fun DeviceEditorDialog(
                         Text(
                             tr("device.labelEditor") + "：" + editor.displayName,
                             fontSize = 12.sp,
-                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                             modifier = Modifier.weight(1f),
                         )
                         TextButton(onClick = {
@@ -538,9 +538,9 @@ private fun DeviceEditorDialog(
                 )
                 DropdownMenu(commExpanded, { commExpanded = false }) {
                     CommType.entries.forEach { c ->
-                        DropdownMenuItem(onClick = { dev = dev.copy(commType = c); commExpanded = false }) {
+                        DropdownMenuItem(onClick = { dev = dev.copy(commType = c); commExpanded = false }, text = {
                             Text(c.name)
-                        }
+                        })
                     }
                 }
 
@@ -568,7 +568,7 @@ private fun DeviceEditorDialog(
                             DropdownMenuItem(onClick = {
                                 dev = dev.copy(serial = dev.serial.copy(parity = p))
                                 parityExpanded = false
-                            }) { Text("$p") }
+                            }, text = { Text("$p") })
                         }
                     }
                     OutlinedTextField(
@@ -594,7 +594,7 @@ private fun DeviceEditorDialog(
                             message,
                             fontSize = 11.sp,
                             color = if (detectOk == false) UiColors.Error
-                            else MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -617,13 +617,13 @@ private fun DeviceEditorDialog(
                     trailingIcon = { TextButton(onClick = { groupExpanded = true }) { Text("▾") } },
                 )
                 DropdownMenu(groupExpanded, { groupExpanded = false }) {
-                    DropdownMenuItem(onClick = { dev = dev.copy(groupId = 0); groupExpanded = false }) {
+                    DropdownMenuItem(onClick = { dev = dev.copy(groupId = 0); groupExpanded = false }, text = {
                         Text(tr("group.none"))
-                    }
+                    })
                     groups.forEach { g ->
-                        DropdownMenuItem(onClick = { dev = dev.copy(groupId = g.id); groupExpanded = false }) {
+                        DropdownMenuItem(onClick = { dev = dev.copy(groupId = g.id); groupExpanded = false }, text = {
                             Text(g.name)
-                        }
+                        })
                     }
                 }
             }

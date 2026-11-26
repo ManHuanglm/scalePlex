@@ -14,18 +14,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Divider
-import androidx.compose.material.Icon
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Label
-import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Alignment
@@ -48,13 +48,13 @@ fun RibbonBar(state: AppState, refresh: MutableState<Int>) {
     val items: List<Pair<String, ImageVector>> = listOf(
         "tab.devices" to Icons.Default.Devices,
         "tab.plu" to Icons.Default.ShoppingCart,
-        "tab.label" to Icons.Default.Label,
-        "tab.trade" to Icons.Default.ReceiptLong,
+        "tab.label" to Icons.AutoMirrored.Filled.Label,
+        "tab.trade" to Icons.AutoMirrored.Filled.ReceiptLong,
         "tab.settings" to Icons.Default.Settings,
         "tab.about" to Icons.Default.Info,
     )
 
-    Surface(color = MaterialTheme.colors.surface, elevation = 1.dp) {
+    Surface(color = MaterialTheme.colorScheme.surface, shadowElevation = 1.dp) {
         Column {
             Row(
                 modifier = Modifier
@@ -70,7 +70,7 @@ fun RibbonBar(state: AppState, refresh: MutableState<Int>) {
                             .width(76.dp)
                             .clip(RoundedCornerShape(6.dp))
                             .background(
-                                if (selected) MaterialTheme.colors.primary.copy(alpha = 0.14f) else Color.Transparent,
+                                if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent,
                             )
                             .clickable {
                                 state.selectedTab = index
@@ -82,8 +82,8 @@ fun RibbonBar(state: AppState, refresh: MutableState<Int>) {
                         Icon(
                             icon,
                             contentDescription = tr(key),
-                            tint = if (selected) MaterialTheme.colors.primary
-                            else MaterialTheme.colors.onSurface.copy(alpha = 0.72f),
+                            tint = if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f),
                             modifier = Modifier.size(26.dp),
                         )
                         Spacer(Modifier.height(3.dp))
@@ -91,14 +91,14 @@ fun RibbonBar(state: AppState, refresh: MutableState<Int>) {
                             tr(key),
                             fontSize = 11.sp,
                             maxLines = 1,
-                            color = if (selected) MaterialTheme.colors.primary
-                            else MaterialTheme.colors.onSurface.copy(alpha = 0.85f),
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
                             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                         )
                     }
                 }
             }
-            Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
         }
     }
 }

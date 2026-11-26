@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,12 +27,12 @@ import com.scaleplex.core.model.DeviceStatus
 fun StatusBar(state: AppState) {
     val online = state.deviceRuntimes.values.count { it.status == DeviceStatus.ONLINE }
     val total = state.deviceRuntimes.size
-    val secondary = MaterialTheme.colors.onSurface.copy(alpha = 0.65f)
+    val secondary = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
 
     Surface(
         modifier = Modifier.fillMaxWidth().height(26.dp),
-        color = MaterialTheme.colors.surface,
-        elevation = 6.dp,
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 6.dp,
     ) {
         Row(
             modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),

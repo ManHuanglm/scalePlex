@@ -2,25 +2,23 @@ package com.scaleplex.app.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Shapes
-import androidx.compose.material.darkColors
-import androidx.compose.material.lightColors
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-private val LightColors = lightColors(
+private val LightColors = lightColorScheme(
     primary = Color(0xFF1E6FD9),
-    primaryVariant = Color(0xFF1557B0),
     secondary = Color(0xFF00A884),
     background = Color(0xFFF5F6F8),
     surface = Color.White,
 )
 
-private val DarkColors = darkColors(
+private val DarkColors = darkColorScheme(
     primary = Color(0xFF4C8DFF),
-    primaryVariant = Color(0xFF2F6FE0),
     secondary = Color(0xFF00C49A),
     background = Color(0xFF1E1F22),
     surface = Color(0xFF26282C),
@@ -46,7 +44,7 @@ object UiColors {
 @Composable
 fun Theme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     MaterialTheme(
-        colors = if (dark) DarkColors else LightColors,
+        colorScheme = if (dark) DarkColors else LightColors,
         shapes = Shapes(
             small = RoundedCornerShape(4.dp),
             medium = RoundedCornerShape(6.dp),

@@ -15,7 +15,7 @@ dependencies {
 
     implementation(compose.desktop.currentOs)
     implementation(compose.foundation)
-    implementation(compose.material)
+    implementation(compose.material3)
     implementation(compose.ui)
     implementation(compose.materialIconsExtended)
     implementation(libs.kotlinx.coroutines.swing)

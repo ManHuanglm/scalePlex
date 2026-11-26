@@ -25,9 +25,9 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.material.Divider
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -138,9 +138,8 @@ fun ScrollableTable(
     Surface(
         modifier = modifier,
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colors.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.12f)),
-        elevation = 0.dp,
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -149,13 +148,13 @@ fun ScrollableTable(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(with(density) { headerHeightPx.toDp() })
-                        .background(MaterialTheme.colors.onSurface.copy(alpha = 0.04f)),
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f)),
                 )
                 Column(modifier = Modifier.fillMaxSize().horizontalScroll(table.scroll)) {
                     Box(modifier = Modifier.onSizeChanged { headerHeightPx = it.height }) {
                         header()
                     }
-                    Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.width(table.totalWidth).weight(1f),
@@ -170,7 +169,7 @@ fun ScrollableTable(
                         .fillMaxHeight(),
                 )
             }
-            Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
             HorizontalScrollbar(
                 adapter = rememberScrollbarAdapter(table.scroll),
                 modifier = Modifier.fillMaxWidth(),
