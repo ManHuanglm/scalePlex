@@ -12,8 +12,10 @@ import com.scaleplex.db.Database
 import com.scaleplex.db.dao.DeviceDao
 import com.scaleplex.db.dao.GroupDao
 import com.scaleplex.driver.api.IScaleDriver
+import com.scaleplex.driver.api.ScaleDetection
 import com.scaleplex.driver.api.ScaleDriverFactory
 import com.scaleplex.driver.impl.DriverRegistry
+import com.scaleplex.driver.impl.detect.ScaleAutoDetector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -74,6 +76,12 @@ class ScaleService(db: Database) {
         drivers.getOrPut(device.id) { ScaleDriverFactory.create(device) }
 
     fun isBrandSupported(brand: com.scaleplex.core.model.ScaleBrand) = ScaleDriverFactory.isSupported(brand)
+
+    /**
+     * IP 自动识别品牌/型号（添加秤对话框调用）：端口指纹 + 各品牌协议握手探测，
+     * 未命中返回 null。探测顺序与外部工具依赖见 [ScaleAutoDetector]。
+     */
+    suspend fun detectBrandByIp(ip: String): ScaleDetection? = ScaleAutoDetector.detect(ip)
 
     /** Connect a single device and refresh its runtime status. */
     suspend fun connect(device: ScaleDevice): DeviceRuntime {

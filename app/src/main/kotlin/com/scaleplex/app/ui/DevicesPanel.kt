@@ -25,6 +25,7 @@ import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.Text
 import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -55,6 +56,9 @@ import com.scaleplex.core.model.MtLabelEditor
 import com.scaleplex.core.model.ScaleBrand
 import com.scaleplex.core.model.ScaleDevice
 import com.scaleplex.core.model.ScaleGroup
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 /**
@@ -343,6 +347,18 @@ private fun formatInfoTime(lastSeen: Long): String =
     if (lastSeen <= 0L) "-"
     else java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss", java.util.Locale.ROOT).format(java.util.Date(lastSeen))
 
+/** 自动识别防抖：IP 输入停顿该时长后触发探测。 */
+private const val AUTO_DETECT_DEBOUNCE_MS = 1200L
+
+/** IPv4 格式校验（四段 0~255 数字）。 */
+private fun isValidIpv4(ip: String): Boolean {
+    val parts = ip.trim().split(".")
+    if (parts.size != 4) return false
+    return parts.all { part ->
+        part.isNotEmpty() && part.toIntOrNull()?.let { it in 0..255 } == true
+    }
+}
+
 @Composable
 private fun GroupEditorDialog(initial: ScaleGroup, onDismiss: () -> Unit, onSave: (ScaleGroup) -> Unit) {
     var group by remember { mutableStateOf(initial) }
@@ -378,6 +394,56 @@ private fun DeviceEditorDialog(
 ) {
     var dev by remember { mutableStateOf(initial) }
     var editorError by remember { mutableStateOf<String?>(null) }
+    var detecting by remember { mutableStateOf(false) }
+    var detectOk by remember { mutableStateOf<Boolean?>(null) }
+    var detectMessage by remember { mutableStateOf<String?>(null) }
+    var detectJob by remember { mutableStateOf<Job?>(null) }
+    val scope = rememberCoroutineScope()
+
+    // IP 自动识别：命中后回填品牌/型号/通信方式/端口（port=null 的品牌保持用户输入）
+    fun startDetection() {
+        detectJob?.cancel()
+        detectJob = scope.launch {
+            detecting = true
+            detectOk = null
+            detectMessage = tr("device.detect.running")
+            val result = runCatching { state.scaleService.detectBrandByIp(dev.ip.trim()) }
+            ensureActive() // IP 已再次变更时丢弃过期结果
+            detecting = false
+            result.fold(
+                onSuccess = { detected ->
+                    if (detected == null) {
+                        detectOk = false
+                        detectMessage = tr("device.detect.failed")
+                    } else {
+                        detectOk = true
+                        dev = dev.copy(
+                            brand = detected.brand,
+                            model = detected.model,
+                            commType = detected.commType,
+                            port = detected.port ?: dev.port,
+                        )
+                        val modelText = detected.model.takeIf { it.isNotBlank() }?.let { " / $it" } ?: ""
+                        detectMessage =
+                            tr("device.detect.success") + detected.brand.displayName + modelText +
+                            " · " + detected.matchedBy
+                    }
+                },
+                onFailure = {
+                    detectOk = false
+                    detectMessage = tr("device.detect.failed")
+                },
+            )
+        }
+    }
+
+    // 新增设备：IP 输入停顿后自动识别；编辑已有设备不自动触发（避免覆盖手工选择）
+    LaunchedEffect(dev.ip) {
+        if (initial.id != 0L || dev.commType == CommType.SERIAL || !isValidIpv4(dev.ip)) return@LaunchedEffect
+        delay(AUTO_DETECT_DEBOUNCE_MS)
+        startDetection()
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (initial.id == 0L) tr("device.add") else tr("device.edit")) },
@@ -516,7 +582,22 @@ private fun DeviceEditorDialog(
                         dev.ip, { dev = dev.copy(ip = it) },
                         label = { Text(tr("device.field.ip")) },
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        trailingIcon = {
+                            TextButton(onClick = ::startDetection, enabled = !detecting) {
+                                Text(if (detecting) tr("device.detect.running") else tr("device.detect"))
+                            }
+                        },
                     )
+                    // 识别结果提示：成功回填品牌/型号，失败提示手动选择
+                    detectMessage?.let { message ->
+                        Text(
+                            message,
+                            fontSize = 11.sp,
+                            color = if (detectOk == false) UiColors.Error
+                            else MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                     // 寺冈 TWS 协议的"端口"参数为秤号（LabelNet/秤端设置页均填秤号，通常为秤 IP 后 3 位）
                     val portLabel = if (dev.brand == ScaleBrand.DIGI) tr("device.field.scaleNo") else tr("device.field.port")
                     OutlinedTextField(
