@@ -1,6 +1,7 @@
 package com.scaleplex.driver.impl.detect
 
 import com.scaleplex.core.model.CommType
+import com.scaleplex.core.model.PluItem
 import com.scaleplex.core.model.ScaleBrand
 import com.scaleplex.core.model.ScaleDevice
 import com.scaleplex.driver.impl.cas.CasClDriver
@@ -53,5 +54,37 @@ class RongtaCasRealMachineIT {
         if (status.getOrNull()?.online != true) {
             org.junit.Assume.assumeTrue("凯士秤 192.168.0.111 不可达，跳过", false)
         }
+    }
+
+    /** 与用户经原厂软件下发过的数据一致（幂等，不破坏秤端现状）。 */
+    private fun baiCai() = PluItem(
+        pluNo = 1,
+        name = "大白菜",
+        mainGroup = 24,
+        unitPrice = 2000,
+        eanCode = "99",
+        usedByDate = 15,
+    )
+
+    @Test
+    fun `rongta plu download`() = runBlocking {
+        val drv = RongtaUdpDriver(rongta())
+        if (drv.getStatus().getOrNull()?.online != true) {
+            org.junit.Assume.assumeTrue("容大秤 192.168.0.96 不可达，跳过", false)
+        }
+        val r = drv.downloadPluBatch(listOf(baiCai()))
+        println("rongta download: $r")
+        check(r.isSuccess) { "容大下发失败: ${r.exceptionOrNull()?.message}" }
+    }
+
+    @Test
+    fun `cas plu download`() = runBlocking {
+        val drv = CasClDriver(cas())
+        if (drv.getStatus().getOrNull()?.online != true) {
+            org.junit.Assume.assumeTrue("凯士秤 192.168.0.111 不可达，跳过", false)
+        }
+        val r = drv.downloadPluBatch(listOf(baiCai().copy(mainGroup = 1)))
+        println("cas download: $r")
+        check(r.isSuccess) { "凯士下发失败: ${r.exceptionOrNull()?.message}" }
     }
 }

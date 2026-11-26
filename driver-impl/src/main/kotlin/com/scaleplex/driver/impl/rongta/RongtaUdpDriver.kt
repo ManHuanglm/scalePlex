@@ -14,6 +14,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.SocketException
+import java.nio.charset.Charset
 
 /**
  * 容大 Rongta RLS1000 条码秤驱动（真机校准 2026-11-26 @192.168.0.96）。
@@ -53,11 +54,34 @@ class RongtaUdpDriver(
     }
 
     override suspend fun downloadPlu(plu: PluItem): Result<Unit> = withContext(Dispatchers.IO) {
-        Result.failure(UnsupportedOperationException(FIELD_CALIBRATION_PENDING))
+        downloadPluBatch(listOf(plu)).map { }
     }
 
+    /**
+     * PLU 批量下发（真机抓包标定 2026-11-26）：
+     * 会话帧(0E01+BCD 时间戳) → 配置帧(0E04) → 0B 数据帧(每帧 4 条 PLU) → 01 名称帧(每 PLU 一帧)
+     * → 结束帧(0E02)，每帧重复发送 8 次（秤端每帧回 1 字节 0x02 ACK，发送侧忽略）。
+     */
     override suspend fun downloadPluBatch(list: List<PluItem>): Result<BatchResult> = withContext(Dispatchers.IO) {
-        Result.failure(IllegalStateException(FIELD_CALIBRATION_PENDING))
+        runCatching {
+            if (list.isEmpty()) return@runCatching BatchResult.ok(0)
+            DatagramSocket().use { sock ->
+                sock.broadcast = true
+                val addr = InetAddress.getByName(device.ip)
+                fun send8(frame: ByteArray) {
+                    repeat(8) {
+                        sock.send(DatagramPacket(frame, frame.size, addr, device.port))
+                        Thread.sleep(FRAME_GAP_MS)
+                    }
+                }
+                send8(sessionFrame())
+                send8(configFrame())
+                list.chunked(PLUS_PER_FRAME).forEach { chunk -> send8(pluDataFrame(chunk)) }
+                list.forEach { send8(pluNameFrame(it)) }
+                send8(endFrame())
+                BatchResult.ok(list.size)
+            }
+        }
     }
 
     override suspend fun deletePlu(pluNo: Int): Result<Unit> =
@@ -108,9 +132,120 @@ class RongtaUdpDriver(
             true
         }
 
+    // ---- 帧构造（布局经真机抓包标定，见类注释） ----
+
+    private fun blankFrame(type: Int): ByteArray = ByteArray(FRAME_SIZE).also { it[0] = type.toByte() }
+
+    /** 会话开场帧：0E 01 00 34 12 00 + BCD 时间戳(年月日时分秒)。 */
+    private fun sessionFrame(): ByteArray {
+        val f = blankFrame(0x0E)
+        f[1] = 0x01
+        f[2] = 0x00
+        f[3] = 0x34
+        f[4] = 0x12
+        f[5] = 0x00
+        val now = java.time.LocalDateTime.now()
+        val bcd = listOf(now.year % 100, now.monthValue, now.dayOfMonth, now.hour, now.minute, now.second)
+        bcd.forEachIndexed { i, v -> f[6 + i] = bcdByte(v) }
+        return f
+    }
+
+    /** 配置帧：0E 04 00 04 04 04 04（真机原样）。 */
+    private fun configFrame(): ByteArray {
+        val f = blankFrame(0x0E)
+        f[1] = 0x04
+        f[2] = 0x00
+        f[3] = 0x04
+        f[4] = 0x04
+        f[5] = 0x04
+        f[6] = 0x04
+        return f
+    }
+
+    /** 结束帧：0E 02 00 34 12 00。 */
+    private fun endFrame(): ByteArray {
+        val f = blankFrame(0x0E)
+        f[1] = 0x02
+        f[2] = 0x00
+        f[3] = 0x34
+        f[4] = 0x12
+        f[5] = 0x00
+        return f
+    }
+
+    /** 01 名称帧：[01][PLU 号 int16 LE][品名 GBK 36B 空格填充][00 填充]。 */
+    private fun pluNameFrame(plu: PluItem): ByteArray {
+        val f = blankFrame(0x01)
+        f[1] = (plu.pluNo and 0xFF).toByte()
+        f[2] = ((plu.pluNo shr 8) and 0xFF).toByte()
+        writeGbkName(f, 3, plu.displayName)
+        return f
+    }
+
+    /**
+     * 0B 数据帧：[0B] + 4 条 64B 子记录。子记录布局（slot 偏移）：
+     * +0..35 品名 GBK 36B；+36..38 货号 int24 LE；+43 部门 BCD；+44 条码低字节；
+     * +45..48 价格 4B BCD(×100，8 位数字)；+49 固定 0x04；+50 保质期 int8 天；
+     * +57 固定 0x05；其余 00。
+     */
+    private fun pluDataFrame(chunk: List<PluItem>): ByteArray {
+        val f = blankFrame(0x0B)
+        chunk.forEachIndexed { k, plu ->
+            val base = 1 + k * SLOT_SIZE
+            writeGbkName(f, base + 2, plu.displayName)
+            val no = plu.pluNo
+            // 货号 int24 大端（真机样例 PLU1 = 00 00 01）
+            f[base + 38] = ((no shr 16) and 0xFF).toByte()
+            f[base + 39] = ((no shr 8) and 0xFF).toByte()
+            f[base + 40] = (no and 0xFF).toByte()
+            f[base + 43] = bcdByte(deptCode(plu.mainGroup))
+            f[base + 44] = (barcodeByte(plu.eanCode)).toByte()
+            writeBcdPrice(f, base + 45, plu.unitPrice)
+            f[base + 49] = 0x04
+            f[base + 50] = (plu.effectiveShelfLifeDays.coerceIn(0, 255)).toByte()
+            f[base + 57] = 0x05
+        }
+        return f
+    }
+
+    /** 品名 GBK 写入 [off, off+36)，不足补空格，超长截断。 */
+    private fun writeGbkName(f: ByteArray, off: Int, name: String) {
+        val bytes = name.toByteArray(gbkCharset())
+        val n = minOf(bytes.size, NAME_SIZE)
+        for (i in 0 until NAME_SIZE) {
+            f[off + i] = if (i < n) bytes[i] else ' '.code.toByte()
+        }
+    }
+
+    /** 价格 4B BCD：分 → 8 位十进制数字，两位一字节（999999.99 元上限）。 */
+    private fun writeBcdPrice(f: ByteArray, off: Int, minor: Long) {
+        val digits = minor.coerceIn(0, 99_999_999L).toString().padStart(8, '0')
+        for (i in 0 until 4) {
+            val hi = digits[i * 2].digitToInt()
+            val lo = digits[i * 2 + 1].digitToInt()
+            f[off + i] = ((hi shl 4) or lo).toByte()
+        }
+    }
+
+    /** 两位十进制 → BCD 字节（部门/时间用）。 */
+    private fun bcdByte(v: Int): Byte = (((v / 10) shl 4) or (v % 10)).toByte()
+
+    /** GBK 字符集（品名/文本编码）。 */
+    private fun gbkCharset(): Charset = Charset.forName("GBK")
+
+    /** 部门取 1..99（BCD 可编码范围），超界回退 1。 */
+    private fun deptCode(mainGroup: Int): Int = if (mainGroup in 1..99) mainGroup else 1
+
+    /** 条码取纯数字前缀并取低 8 位（秤端该字段仅 1 字节，真机样例 99）。 */
+    private fun barcodeByte(ean: String): Int =
+        ean.filter { it.isDigit() }.take(9).toIntOrNull()?.and(0xFF) ?: 0
+
     companion object {
         private const val PROBE_WAIT_MS = 300L
-        private const val FIELD_CALIBRATION_PENDING =
-            "容大 PLU 下发字段待标定（价格/条码字段偏移未定位），请先用原厂 RTPLU 完成标定后接入"
+        private const val FRAME_SIZE = 257
+        private const val SLOT_SIZE = 64
+        private const val NAME_SIZE = 36
+        private const val PLUS_PER_FRAME = 4
+        private const val FRAME_GAP_MS = 5L
     }
 }

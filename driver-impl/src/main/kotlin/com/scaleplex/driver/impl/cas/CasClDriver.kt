@@ -1,5 +1,6 @@
 package com.scaleplex.driver.impl.cas
 
+import com.scaleplex.core.model.BatchError
 import com.scaleplex.core.model.BatchResult
 import com.scaleplex.core.model.LabelTemplate
 import com.scaleplex.core.model.PluItem
@@ -28,8 +29,8 @@ import java.nio.charset.Charset
  *   异步建立，须等待数秒再查 `IsOpen(ip, port)`；用完 `Close(ip, port)`；
  * - PROTOCOL_TYPE：CL5000=5000/CL5000J=5010/CL5200=5200/CL5200J=5210/CL5500=5500/CL7000=7000。
  *
- * 在线探测 = Open + IsOpen 组合；PLU 下发/回收走 CommManager.AppCommManager +
- * Cl5k.Plu.Make4Download（TransType.Download=1000/Upload=2000），待接入。
+ * 在线探测 = Open + IsOpen 组合；PLU 下发 = ASCII 键值协议（抓包逆向，见 downloadPluBatch）；
+ * 回收/删除/时间同步走 CommManager.AppCommManager + Cl5k（待接入）。
  *
  * 前置条件：系统属性 `scaleplex.cas.tools` 指向含 CasComm.dll/CasLib.dll/config 的
  * CL-Works Pro 目录（默认用本机已验证的调试包路径）。
@@ -60,11 +61,116 @@ class CasClDriver(
         }
     }
 
-    override suspend fun downloadPlu(plu: PluItem): Result<Unit> =
-        Result.failure(UnsupportedOperationException(CAS_DOWNLOAD_PENDING))
+    /**
+     * PLU 批量下发（真机抓包标定 2026-11-26：CL-Works Pro 下载报文逆向）：
+     * ASCII 键值协议 `W02A<PLU:5>,01L010A:F=<字段>.<类型>,<长度>:<数据>...`，
+     * 秤端应答 `...W02:O` = OK。字段：01=PLU号(int16LE) 02=部门(int32LE)
+     * 04=? 06=单价(int32LE 分) 0A=品名(GBK)，其余字段按真机模板置零。
+     */
+    override suspend fun downloadPlu(plu: PluItem): Result<Unit> = withContext(Dispatchers.IO) {
+        downloadPluBatch(listOf(plu)).map { }
+    }
 
-    override suspend fun downloadPluBatch(list: List<PluItem>): Result<BatchResult> =
-        Result.failure(IllegalStateException(CAS_DOWNLOAD_PENDING))
+    override suspend fun downloadPluBatch(list: List<PluItem>): Result<BatchResult> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (list.isEmpty()) return@runCatching BatchResult.ok(0)
+            java.net.Socket().use { sock ->
+                sock.tcpNoDelay = true
+                sock.connect(java.net.InetSocketAddress(device.ip, device.port), 5000)
+                sock.soTimeout = RESPONSE_TIMEOUT_MS.toInt()
+                val out = sock.getOutputStream()
+                val inp = sock.getInputStream()
+                var ok = 0
+                val errors = mutableListOf<BatchError>()
+                for (plu in list) {
+                    val frame = buildCasPluFrame(plu)
+                    // 原厂模式：同帧重复发送 8 次（间隔 ~50ms），秤端去重后应答 W02:O/E
+                    repeat(8) {
+                        out.write(frame)
+                        out.flush()
+                        Thread.sleep(FRAME_GAP_MS)
+                    }
+                    val resp = readUntilW02(inp)
+                    val text = resp?.toString(Charsets.ISO_8859_1) ?: ""
+                    if (text.contains("W02:O")) {
+                        ok++
+                    } else {
+                        errors += BatchError(device.id, plu.pluNo, "凯士未确认 (期望 W02:O): ${text.take(80)}")
+                    }
+                }
+                BatchResult(total = list.size, success = ok, failed = list.size - ok, errors = errors)
+            }
+        }
+    }
+
+    /** 读取秤端应答直到出现 W02: 标记（超时返回已收内容）。 */
+    private fun readUntilW02(inp: java.io.InputStream): ByteArray? {
+        val deadline = System.currentTimeMillis() + RESPONSE_TIMEOUT_MS
+        val buf = ByteArray(4096)
+        var acc = ByteArray(0)
+        while (System.currentTimeMillis() < deadline) {
+            val n = try {
+                inp.read(buf)
+            } catch (_: java.net.SocketTimeoutException) {
+                return if (acc.isEmpty()) null else acc
+            }
+            if (n <= 0) return if (acc.isEmpty()) null else acc
+            acc += buf.copyOf(n)
+            if (String(acc, Charsets.ISO_8859_1).contains("W02:")) return acc
+        }
+        return if (acc.isEmpty()) null else acc
+    }
+
+    /**
+     * 构造凯士 PLU 下发 ASCII 帧。字节经 ISO-8859-1 直通保持二进制安全；
+     * L010A 为标签字段（真机 PLU1 样例，语义待进一步标定）。
+     */
+    private fun buildCasPluFrame(plu: PluItem): ByteArray {
+        val sb = StringBuilder()
+        sb.append("W02A%05d,01L010A:".format(plu.pluNo.coerceIn(0, 99999)))
+        sb.append(field("01", "57", intLe(plu.pluNo, 2)))
+        sb.append(field("02", "4C", intLe(casDept(plu.mainGroup), 4)))
+        sb.append(field("04", "4D", byteArrayOf(0x01)))
+        sb.append(field("06", "4C", intLe(plu.unitPrice.coerceIn(0, Int.MAX_VALUE.toLong()).toInt(), 4)))
+        sb.append(field("0B", "4C", intLe(0, 4)))
+        sb.append(field("0F", "42", byteArrayOf(0x00)))
+        sb.append(field("10", "4C", intLe(0, 4)))
+        sb.append(field("13", "42", byteArrayOf(0x00)))
+        sb.append(field("03", "53", ByteArray(0)))
+        sb.append(field("4C", "42", byteArrayOf(0x00)))
+        sb.append(field("4D", "42", byteArrayOf(0x00)))
+        sb.append(field("4E", "42", byteArrayOf(0x00)))
+        sb.append(field("4F", "42", byteArrayOf(0x00)))
+        sb.append(field("27", "42", byteArrayOf(0x00)))
+        sb.append(field("28", "42", byteArrayOf(0x00)))
+        sb.append(field("29", "42", byteArrayOf(0x00)))
+        sb.append(field("2A", "42", byteArrayOf(0x00)))
+        sb.append(field("2B", "42", byteArrayOf(0x00)))
+        sb.append(field("0A", "53", plu.displayName.toByteArray(gbkCharset())))
+        sb.append(field("1E", "53", ByteArray(0)))
+        sb.append(field("1F", "53", ByteArray(0)))
+        sb.append(field("5C", "53", ByteArray(0)))
+        sb.append(field("5D", "53", ByteArray(0)))
+        return sb.toString().toByteArray(Charsets.ISO_8859_1)
+    }
+
+    /** 单字段：`F=<字段ID>.<类型>,<长度>:<数据>`。 */
+    private fun field(id: String, type: String, data: ByteArray): String =
+        "F=$id.$type,${data.size}:" + String(data, Charsets.ISO_8859_1)
+
+    private fun intLe(value: Int, size: Int): ByteArray {
+        val out = ByteArray(size)
+        for (i in 0 until size) {
+            out[i] = ((value shr (8 * i)) and 0xFF).toByte()
+        }
+        return out
+    }
+
+    /** 部门取 1..9999，超界回退 1。 */
+    private fun casDept(mainGroup: Int): Int = if (mainGroup in 1..9999) mainGroup else 1
+
+    /** GBK 字符集（品名/文本编码）。 */
+    private fun gbkCharset(): Charset = Charset.forName("GBK")
 
     override suspend fun deletePlu(pluNo: Int): Result<Unit> =
         Result.failure(UnsupportedOperationException("凯士删除 PLU 待接入（Cl5k.Plu.Make4DeleteOne）"))
@@ -179,10 +285,10 @@ class CasClDriver(
 
         private const val PROBE_TIMEOUT_MS = 40_000L
 
+        private const val RESPONSE_TIMEOUT_MS = 8_000L
+        private const val FRAME_GAP_MS = 50L
+
         /** Scales 为全局状态库，多设备并发探测会互相干扰，串行化。 */
         private val bridgeMutex = Mutex()
-
-        private const val CAS_DOWNLOAD_PENDING =
-            "凯士 PLU 下发待接入（CommManager.SendTransData + Cl5k.Plu.Make4Download，字段映射待联调）"
     }
 }
