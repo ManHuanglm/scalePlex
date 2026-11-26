@@ -3,10 +3,12 @@ package com.scaleplex.driver.impl
 import com.scaleplex.core.model.ScaleBrand
 import com.scaleplex.driver.api.ScaleDriverFactory
 import com.scaleplex.driver.impl.aclas.AclasDriver
+import com.scaleplex.driver.impl.cas.CasClDriver
 import com.scaleplex.driver.impl.dahua.DahuaDriver
 import com.scaleplex.driver.impl.digi.DigiSmDriver
 import com.scaleplex.driver.impl.hihong.HiHongUdpDriver
 import com.scaleplex.driver.impl.mettler.MettlerToledoDriver
+import com.scaleplex.driver.impl.rongta.RongtaUdpDriver
 import com.scaleplex.driver.impl.yousheng.YouShengDriver
 
 /**
@@ -28,6 +30,8 @@ object DriverRegistry {
             ScaleDriverFactory.register(ScaleBrand.HIHONG) { device -> HiHongUdpDriver(device) }
             ScaleDriverFactory.register(ScaleBrand.METTLER_TOLEDO) { device -> MettlerToledoDriver(device) }
             ScaleDriverFactory.register(ScaleBrand.DINGTOP) { device -> AclasDriver(device) }
+            ScaleDriverFactory.register(ScaleBrand.CAS) { device -> CasClDriver(device) }
+            ScaleDriverFactory.register(ScaleBrand.RONGTA) { device -> RongtaUdpDriver(device) }
             installed = true
         }
     }

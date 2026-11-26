@@ -36,9 +36,10 @@ import java.net.Socket
  * 4. 大华：TCP 4001 任意应答（友声帧未命中时兜底）；
  * 5. 托利多：TCP 3001 预检 + ScaleKey CheckOnline（按 ScaleType 候选逐个尝试）；
  * 6. 顶尖：AclasSDK GetDevicesInfo（设备名即型号）；
- * 7. 凯士：TCP 20304 端口指纹（CAS 默认端口，CL 族私有协议无公开规范，暂以端口识别）；
- * 8. 辉宏：UDP 1111 状态帧 ACK（协议待真机校准，尽力探测）；
- * 9. 寺冈 8442 族：TWS.exe RDR（秤号候选 = IP 尾段 / 1，最后手段）。
+ * 7. 凯士：TCP 20304 端口指纹（CAS 默认端口，CL 族私有协议无公开规范）；
+ * 8. 容大：TCP 9100/25/110/143 端口组指纹（RLS1000 传秤走 UDP 5001 无应答，TCP 指纹替代）；
+ * 9. 辉宏：UDP 1111 状态帧 ACK（协议待真机校准，尽力探测）；
+ * 10. 寺冈 8442 族：TWS.exe RDR（秤号候选 = IP 尾段 / 1，最后手段）。
  *
  * 全部未命中返回 null（设备离线、端口未开放或外部工具未配置）。
  */
@@ -70,6 +71,12 @@ object ScaleAutoDetector {
     /** 凯士 CAS 默认端口（CL 族条码秤 TCP 监听端口，真机校准 2026-11-26）。 */
     private const val CAS_DEFAULT_PORT = 20304
 
+    /** 容大 RLS1000 UDP 传秤端口（TCP 同号不开放，仅用于回填）。 */
+    private const val RONGTA_DEFAULT_PORT = 5001
+
+    /** 容大 RLS1000 TCP 端口组指纹：原始打印 + 邮件三件套（真机 2026-11-26）。 */
+    private val RONGTA_FINGERPRINT_PORTS = listOf(9100, 25, 110, 143)
+
     /**
      * 托利多 ScaleType 候选（真机校准：b 族 bCom/bComS/bPlus 三值 CheckOnline 互通，
      * RL00 终端必须 RL00，8442 族必须 8442；b 族具体型号无法从探测区分）。
@@ -90,6 +97,7 @@ object ScaleAutoDetector {
                 ACLAS_DEFAULT_PORT,
                 DAHUA_YOUSHENG_PORT,
                 CAS_DEFAULT_PORT,
+                9100, 25, 110, 143,
                 2000 + lastSegment,
             ),
         )
@@ -101,6 +109,7 @@ object ScaleAutoDetector {
             ?: detectMettler(trimmed, ports)
             ?: detectAclas(trimmed, ports)
             ?: detectCas(trimmed, ports)
+            ?: detectRongta(trimmed, ports)
             ?: detectHiHong(trimmed)
             ?: detectDigi8442(trimmed)
     }
@@ -189,8 +198,17 @@ object ScaleAutoDetector {
     private suspend fun detectCas(ip: String, openPorts: Set<Int>): ScaleDetection? {
         if (CAS_DEFAULT_PORT !in openPorts) return null
         return ScaleDetection(
-            ScaleBrand.CAS, "", CAS_DEFAULT_PORT, CommType.TCP,
+            ScaleBrand.CAS, "CL5200", CAS_DEFAULT_PORT, CommType.TCP,
             "TCP 20304 端口开放（CAS 默认端口）",
+        )
+    }
+
+    /** 容大：TCP 端口组指纹（9100+25+110+143 全开即判容大；传秤 UDP 5001 无应用层应答）。 */
+    private suspend fun detectRongta(ip: String, openPorts: Set<Int>): ScaleDetection? {
+        if (RONGTA_FINGERPRINT_PORTS.any { it !in openPorts }) return null
+        return ScaleDetection(
+            ScaleBrand.RONGTA, "RLS1000", RONGTA_DEFAULT_PORT, CommType.UDP,
+            "端口组指纹 9100/25/110/143 全开（Rongta RLS1000）",
         )
     }
 

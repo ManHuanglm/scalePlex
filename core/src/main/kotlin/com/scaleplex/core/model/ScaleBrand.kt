@@ -47,6 +47,7 @@ val METTLER_MODELS: List<String> = listOf(
  * - 顶尖 5002（备选 5001，官方 Demo 硬编码一致）；
  * - 托利多 3001；大华 4001（友声兼容大华模式同为 4001）；
  * - 凯士 20304（真机校准 2026-11-26：CL 族条码秤 TCP 监听端口）；
+ * - 容大 5001（真机校准 2026-11-26：RLS1000 条码秤 UDP 传秤端口，TCP 同号不开放）；
  * - 寺冈 TWS 协议的"端口"参数实际为秤号（LabelNet 配置秤号、秤端 IP 设置页"端口号"栏填秤号，
  *   通常填秤 IP 最后 3 位），默认秤号 1；
  * - 其余品牌无权威数据，暂用 1111 占位（待校准）。
@@ -62,6 +63,7 @@ enum class ScaleBrand(val id: String, val displayName: String, val defaultPort: 
     HIHONG("hihong", "辉宏 HuiHong", 1111),
     METTLER_TOLEDO("mettler_toledo", "梅特勒-托利多 Mettler Toledo", 3001),
     CAS("cas", "CAS 凯士", 20304),
+    RONGTA("rongta", "容大 Rongta", 5001),
     DINGTOP("dingtop", "顶尖 DingTop", 5002),
     ISHIDA("ishida", "石田 Ishida", 1111),
     BIZERBA("bizerba", "碧彩 Bizerba", 1111),
