@@ -32,6 +32,26 @@ class MtScaleKeyXmlTest {
     }
 
     @Test
+    fun `checkonline data file status decides online`() {
+        // 真机捕获（2026-11-25）：3610 关机时 CommandResult 仍 Complete/OK/Succeeded=1，
+        // 但 DataFile 内 CheckOnline/Status=-1 —— 唯一离线权威信号
+        val taskResult = "<MTTaskResult><TaskStatus>Complete</TaskStatus><ReturnCode>OK</ReturnCode>" +
+            "<ScaleResults><ScaleResult><DeviceID>2</DeviceID><TaskStatus>Complete</TaskStatus>" +
+            "<ReturnCode>OK</ReturnCode><CommandResults><CommandResult>" +
+            "<CommandText>CheckOnline</CommandText><TaskStatus>Complete</TaskStatus>" +
+            "<Succeeded>1</Succeeded><ReturnCode>OK</ReturnCode>" +
+            "<DataFile>GUID-1.xml</DataFile></CommandResult></CommandResults></ScaleResult></ScaleResults></MTTaskResult>"
+        val offlineData = "<Data><CheckOnline><Status>-1</Status><Details><Detail><Type>0</Type>" +
+            "<Status>-1</Status></Detail></Details></CheckOnline></Data>"
+        val onlineData = "<Data><CheckOnline><Status>1</Status></CheckOnline></Data>"
+
+        assertEquals("GUID-1.xml", MtScaleKeyXml.firstCommandDataFile(taskResult))
+        assertEquals(-1, MtScaleKeyXml.parseCheckOnlineStatus(offlineData))
+        assertEquals(1, MtScaleKeyXml.parseCheckOnlineStatus(onlineData))
+        assertEquals(null, MtScaleKeyXml.parseCheckOnlineStatus("<Data></Data>"))
+    }
+
+    @Test
     fun `device list xml maps ip port model and command file`() {
         val doc = parseXml(MtScaleKeyXml.buildDeviceListXml(listOf(device), mapOf(7L to "Commands.xml")))
         assertEquals("7", doc.getElementsByTagName("DeviceID").item(0).textContent)
@@ -90,29 +110,30 @@ class MtScaleKeyXmlTest {
 
     @Test
     fun `task result parser maps scale status to results`() {
+        // 真机 RL00 结果字段：TaskStatus（非 Status）、ReturnCode 为 OK/Success
         val resultXml = """
             <?xml version="1.0" encoding="utf-8"?>
             <MTTaskResult>
               <ScaleResult>
                 <DeviceID>7</DeviceID>
-                <ReturnCode>Success</ReturnCode>
-                <Status>Complete</Status>
-                <Percent>100</Percent>
+                <ReturnCode>OK</ReturnCode>
+                <TaskStatus>Complete</TaskStatus>
+                <ProcessPercent>100</ProcessPercent>
                 <CommandResults>
-                  <CommandResult><CommandID>c1</CommandID><ReturnCode>Success</ReturnCode></CommandResult>
+                  <CommandResult><CommandID>c1</CommandID><ReturnCode>OK</ReturnCode></CommandResult>
                 </CommandResults>
               </ScaleResult>
               <ScaleResult>
                 <DeviceID>8</DeviceID>
                 <ReturnCode>ConnectError</ReturnCode>
-                <Status>Error</Status>
-                <Percent>0</Percent>
+                <TaskStatus>Error</TaskStatus>
+                <ProcessPercent>0</ProcessPercent>
               </ScaleResult>
             </MTTaskResult>
         """.trimIndent()
         val results = MtScaleKeyXml.parseTaskResultXml(resultXml)
         assertEquals(2, results.size)
-        assertEquals("Success", results[7L]?.returnCode)
+        assertEquals("OK", results[7L]?.returnCode)
         assertTrue(results[7L]!!.ok)
         assertTrue(!results[8L]!!.ok)
         assertEquals("ConnectError", results[8L]?.returnCode)

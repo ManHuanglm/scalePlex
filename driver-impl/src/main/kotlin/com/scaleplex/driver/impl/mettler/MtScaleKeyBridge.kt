@@ -4,6 +4,8 @@ import com.scaleplex.core.model.BatchError
 import com.scaleplex.core.model.BatchResult
 import com.scaleplex.core.model.ScaleDevice
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -45,12 +47,19 @@ object MtScaleKeyBridge {
     }
 
     /**
+     * MTScaleAPI 任务互斥锁：多台秤并发心跳时 ExecuteTaskInFileW 会互相冲突
+     * （真机校准：两任务同时执行时其一返回 EXEC=False），全部串行化。
+     */
+    private val taskMutex = Mutex()
+
+    /**
      * 以文件方式执行一次 MTScaleKey 任务。
      * [taskDir] 内应已生成 Task.xml（引用 DeviceList/Commands/Data），成功后返回结果文件。
      */
     suspend fun executeTask(taskDir: File, taskId: String, timeoutMs: Long = 120_000): Result<File> =
         withContext(Dispatchers.IO) {
-            runCatching {
+            taskMutex.withLock {
+                runCatching {
                 val dll = dllPath()
                 if (!File(dll).exists()) {
                     error("MTScaleAPI.dll 不存在: $dll （请在系统设置中配置 MTScaleKey DLL 路径）")
@@ -67,7 +76,12 @@ object MtScaleKeyBridge {
 
                 val process = ProcessBuilder(
                     ps.absolutePath, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1.absolutePath,
-                ).redirectErrorStream(true).start()
+                )
+                    // 工作目录切到 DLL 所在目录：MTScaleAPI.dll 的依赖（MTScaleKeyData/MTConfiguration 等）
+                    // 与 MTScaleKey.config 都在其旁，Windows 加载器按 CWD 搜索依赖
+                    .directory(File(dll).parentFile)
+                    .redirectErrorStream(true)
+                    .start()
 
                 val output = process.inputStream.readBytes().toString(java.nio.charset.Charset.defaultCharset())
                 val finished = process.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
@@ -84,6 +98,7 @@ object MtScaleKeyBridge {
                     error("任务未产生结果文件: ${resultFile.absolutePath}；请确认 MTScaleKey 已安装并配置秤列表")
                 }
                 resultFile
+                }
             }
         }
 

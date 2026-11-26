@@ -19,12 +19,13 @@ class ConfigService(db: Database) {
         val g = { k: String, d: String -> dao.get(k) ?: d }
         val config = ScaleConfig(
             language = g("language", "zh-CN"),
+            darkMode = g("darkMode", "false").toBoolean(),
             priceDecimals = (g("priceDecimals", "2")).toIntOrNull() ?: 2,
             weightDecimals = (g("weightDecimals", "3")).toIntOrNull() ?: 3,
             connectTimeoutMs = (g("connectTimeoutMs", "3000")).toIntOrNull() ?: 3000,
             readTimeoutMs = (g("readTimeoutMs", "2000")).toIntOrNull() ?: 2000,
             retries = (g("retries", "3")).toIntOrNull() ?: 3,
-            heartbeatIntervalMs = (g("heartbeatIntervalMs", "5000")).toIntOrNull() ?: 5000,
+            heartbeatIntervalMs = (g("heartbeatIntervalMs", "60000")).toIntOrNull()?.coerceIn(5000, 600000) ?: 60000,
             defaultBrand = ScaleBrand.fromId(g("defaultBrand", "digi")),
             rawPacketLog = g("rawPacketLog", "false").toBoolean(),
             logLevel = g("logLevel", "INFO"),
@@ -56,6 +57,7 @@ class ConfigService(db: Database) {
 
     fun save(cfg: ScaleConfig) {
         dao.put("language", cfg.language)
+        dao.put("darkMode", cfg.darkMode.toString())
         dao.put("priceDecimals", cfg.priceDecimals.toString())
         dao.put("weightDecimals", cfg.weightDecimals.toString())
         dao.put("connectTimeoutMs", cfg.connectTimeoutMs.toString())

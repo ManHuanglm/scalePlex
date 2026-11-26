@@ -48,6 +48,9 @@ abstract class AbstractScaleDriver : IScaleDriver {
     override suspend fun syncTime(): Result<Unit> =
         Result.failure(UnsupportedOperationException("syncTime not implemented for $brand"))
 
+    override suspend fun readTime(): Result<java.time.LocalDateTime> =
+        Result.failure(UnsupportedOperationException("readTime not implemented for $brand"))
+
     override suspend fun downloadLabelTemplate(template: LabelTemplate): Result<Unit> =
         Result.failure(UnsupportedOperationException("downloadLabelTemplate not implemented for $brand"))
 

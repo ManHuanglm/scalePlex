@@ -10,14 +10,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** SM-5100（b 族）LabelPLU 结构编解码测试 —— 布局依据 Delphi `PLU.pas`（默认对齐，总 5284 字节）。 */
+/** SM-5100（b 族）LabelPLU 结构编解码测试 —— 布局依据 Delphi `PLU.pas`（默认对齐，总 5284 字节）。
+ *  整数小端（真机 SM-110N 校准，见 [DigiSm5100PluCodec] 类注释）。 */
 class DigiSm5100PluCodecTest {
 
     private val GBK: Charset = Charset.forName("GBK")
 
-    private fun beInt(b: ByteArray, off: Int): Int =
-        ((b[off].toInt() and 0xFF) shl 24) or ((b[off + 1].toInt() and 0xFF) shl 16) or
-            ((b[off + 2].toInt() and 0xFF) shl 8) or (b[off + 3].toInt() and 0xFF)
+    private fun leInt(b: ByteArray, off: Int): Int =
+        (b[off].toInt() and 0xFF) or ((b[off + 1].toInt() and 0xFF) shl 8) or
+            ((b[off + 2].toInt() and 0xFF) shl 16) or ((b[off + 3].toInt() and 0xFF) shl 24)
 
     @Test
     fun `encodes core fields at delphi aligned offsets`() {
@@ -42,26 +43,26 @@ class DigiSm5100PluCodecTest {
         )
         val b = DigiSm5100PluCodec.encode(plu)
         assertEquals(DigiSm5100PluCodec.STRUCT_SIZE, b.size)
-        assertEquals(1234, beInt(b, 0))          // PLUNo
-        assertEquals(0, beInt(b, 4))             // WeightUnit 计重
-        assertEquals(1, beInt(b, 8))             // UPriceOverride 允许变价
-        assertEquals(2350, beInt(b, 12))         // UPrice
-        assertEquals(5, beInt(b, 16))            // LabelFormat1
-        assertEquals(6, beInt(b, 20))            // LabelFormat2
-        assertEquals(0x21, beInt(b, 24))         // BarFormat
-        assertEquals(3, beInt(b, 52))            // MG
-        assertEquals(45, beInt(b, 56))           // SBDate
-        assertEquals(30, beInt(b, 60))           // UBDate（保质期，天）
-        assertEquals(1200, beInt(b, 64))         // Cost
-        assertEquals(100, beInt(b, 68))          // Tare
-        assertEquals(1, beInt(b, 76))            // TaxNo
+        assertEquals(1234, leInt(b, 0))          // PLUNo
+        assertEquals(0, leInt(b, 4))             // WeightUnit 计重
+        assertEquals(1, leInt(b, 8))             // UPriceOverride 允许变价
+        assertEquals(2350, leInt(b, 12))         // UPrice
+        assertEquals(5, leInt(b, 16))            // LabelFormat1
+        assertEquals(6, leInt(b, 20))            // LabelFormat2
+        assertEquals(0x21, leInt(b, 24))         // BarFormat
+        assertEquals(3, leInt(b, 52))            // MG
+        assertEquals(45, leInt(b, 56))           // SBDate
+        assertEquals(30, leInt(b, 60))           // UBDate（保质期，天）
+        assertEquals(1200, leInt(b, 64))         // Cost
+        assertEquals(100, leInt(b, 68))          // Tare
+        assertEquals(1, leInt(b, 76))            // TaxNo
         // EAN_Data ItemCode char[10]（GBK 原文）
         val itemCode = String(b, 32, 10, GBK).trimEnd('\u0000')
         assertEquals("100001", itemCode)
-        assertEquals(0, beInt(b, 44))            // EAN_Data.BarCodeType
-        assertEquals(2, beInt(b, 48))            // EAN_Data.BarRightData
+        assertEquals(0, leInt(b, 44))            // EAN_Data.BarCodeType
+        assertEquals(2, leInt(b, 48))            // EAN_Data.BarRightData
         // 品名首行（Commodity[0] @188：font int + GBK 文本）
-        assertEquals(DigiSm5100PluCodec.DEFAULT_FONT, beInt(b, 188))
+        assertEquals(DigiSm5100PluCodec.DEFAULT_FONT, leInt(b, 188))
         val name = String(b, 192, 12, GBK)
         assertTrue(name.startsWith("特级苹果"))
     }
@@ -69,9 +70,9 @@ class DigiSm5100PluCodecTest {
     @Test
     fun `pcs unit maps to weight unit 1`() {
         val b = DigiSm5100PluCodec.encode(PluItem(pluNo = 1, unit = PluUnit.PCS.id, weightFlag = 1))
-        assertEquals(1, beInt(b, 4))
+        assertEquals(1, leInt(b, 4))
         val b2 = DigiSm5100PluCodec.encode(PluItem(pluNo = 1, unit = PluUnit.KG.id, weightFlag = 0))
-        assertEquals(0, beInt(b2, 4))
+        assertEquals(0, leInt(b2, 4))
     }
 
     @Test
@@ -79,7 +80,7 @@ class DigiSm5100PluCodecTest {
         val b = DigiSm5100PluCodec.encode(
             PluItem(pluNo = 1, usedByDate = 2, shelfLifeUnit = ShelfLifeUnit.MONTH.id),
         )
-        assertEquals(60, beInt(b, 60)) // 2 月 → 60 天
+        assertEquals(60, leInt(b, 60)) // 2 月 → 60 天
     }
 
     @Test
@@ -133,4 +134,5 @@ class DigiSm5100PluCodecTest {
         assertNull(DigiSm5100PluCodec.parse(ByteArray(DigiSm5100PluCodec.STRUCT_SIZE))) // PLUNo=0
     }
 }
+
 

@@ -2,6 +2,7 @@ package com.scaleplex.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,10 +12,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.AlertDialog
 import androidx.compose.material.Button
 import androidx.compose.material.Checkbox
 import androidx.compose.material.Divider
@@ -24,17 +29,20 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.OutlinedButton
 import androidx.compose.material.OutlinedTextField
 import androidx.compose.material.Text
+import androidx.compose.material.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -61,8 +69,10 @@ import com.scaleplex.app.ui.table.rememberRowHover
 import com.scaleplex.app.ui.table.rememberTableState
 import com.scaleplex.core.i18n.tr
 import com.scaleplex.core.model.BatchResult
+import com.scaleplex.core.model.DeviceStatus
 import com.scaleplex.core.model.PluItem
 import com.scaleplex.core.model.PluUnit
+import com.scaleplex.core.model.ScaleDevice
 import com.scaleplex.core.model.ShelfLifeUnit
 import com.scaleplex.core.util.Numbers
 import com.scaleplex.db.dao.PluDao
@@ -100,6 +110,7 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
     var editing by remember { mutableStateOf<PluItem?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var showCategory by remember { mutableStateOf(false) }
+    var showRecall by remember { mutableStateOf(false) }
     var batchResults by remember { mutableStateOf<Map<Long, BatchResult>?>(null) }
     var recallMessage by remember { mutableStateOf("") }
     var selectedPluNo by remember { mutableStateOf<Int?>(null) }
@@ -146,18 +157,8 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
                 "${tr("plu.checkedCount")} ${checked.size}",
         ) {
             OutlinedButton(onClick = {
-                scope.launch {
-                    // 回收（参考 TOP2000「回收商品」）：逐台回收 PLU 并回写本地库
-                    var total = 0
-                    state.scaleService.devices().filter { it.enabled }.forEach { dev ->
-                        state.scaleService.driverFor(dev).uploadPlu().getOrNull()?.let { items ->
-                            state.pluService.saveAll(items)
-                            total += items.size
-                        }
-                    }
-                    recallMessage = tr("plu.recallDone") + total
-                    refresh.value++
-                }
+                // 回收（参考 TOP2000「回收商品」）：弹窗选择要回收的秤，再逐台回收并回写本地库
+                showRecall = true
             }) { Text(tr("plu.upload")) }
             Button(onClick = {
                 editing = PluItem(pluNo = (state.pluService.count() + 1))
@@ -421,6 +422,13 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
     if (showCategory) {
         CategoryDialog(state, onDismiss = { showCategory = false; refresh.value++ })
     }
+    if (showRecall) {
+        RecallDevicesDialog(state, onDismiss = { showRecall = false }) { total ->
+            recallMessage = tr("plu.recallDone") + total
+            showRecall = false
+            refresh.value++
+        }
+    }
     batchResults?.let {
         BatchResultDialog(state, it, onDismiss = { batchResults = null })
     }
@@ -658,4 +666,248 @@ private fun barcodeTypeLabel(p: PluItem): String = when (p.barcodeType) {
 private fun summarize(lines: List<com.scaleplex.core.model.PluTextLine>): String {
     val first = lines.firstOrNull()?.text ?: return "-"
     return if (first.length > 10) first.take(10) + "…" else first
+}
+
+/**
+ * 从秤回收：弹窗选择要回收的秤（单选，默认选中第一台在线秤；可选「全部设备」）。
+ * 回收完成后切换为**结果视图**：按秤的品牌 + 名称 + IP 分组，点击秤行展开该秤回收到的
+ * PLU 明细（货号/名称/单价/条码）；商品已即时回写本地库，点「关闭」返回并刷新列表。
+ */
+@Composable
+private fun RecallDevicesDialog(state: AppState, onDismiss: () -> Unit, onDone: (Int) -> Unit) {
+    val devices = remember { state.scaleService.devices().filter { it.enabled } }
+    // -1 = 全部设备；否则为选中的设备 id（默认第一台在线秤）
+    var selected by remember {
+        mutableStateOf(devices.firstOrNull { state.deviceRuntimes[it.id]?.status == DeviceStatus.ONLINE }?.id ?: devices.firstOrNull()?.id)
+    }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("") }
+    var outcome by remember { mutableStateOf<RecallOutcome?>(null) }
+    val scope = rememberCoroutineScope()
+
+    fun startRecall() {
+        busy = true
+        message = tr("plu.recall.recalling")
+        scope.launch {
+            val targets = if (selected == -1L) devices else devices.filter { it.id == selected }
+            val byScale = mutableListOf<Pair<ScaleDevice, List<PluItem>>>()
+            val failures = mutableListOf<String>()
+            var total = 0
+            for (dev in targets) {
+                state.scaleService.driverFor(dev).uploadPlu().fold(
+                    onSuccess = { items ->
+                        state.pluService.saveAll(items)
+                        byScale.add(dev to items)
+                        total += items.size
+                    },
+                    onFailure = { failures.add("${dev.name}（${deviceAddress(dev)}）：${it.message ?: "error"}") },
+                )
+            }
+            busy = false
+            outcome = RecallOutcome(total, byScale, failures)
+        }
+    }
+
+    val done = outcome
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text(if (done == null) tr("plu.recall.title") else tr("plu.recall.result")) },
+        text = {
+            if (done == null) {
+                Column(modifier = Modifier.width(420.dp)) {
+                    if (devices.isEmpty()) {
+                        Text(
+                            tr("plu.recall.empty"),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(vertical = 12.dp),
+                        )
+                    } else {
+                        DevicePickRow(
+                            label = tr("plu.recall.all"),
+                            detail = "${devices.size}${tr("common.count")}",
+                            selected = selected == -1L,
+                            enabled = !busy,
+                            onSelect = { selected = -1L },
+                        )
+                        devices.forEach { dev ->
+                            DevicePickRow(
+                                label = dev.name.ifBlank { dev.model },
+                                detail = "${dev.brand.displayName} · ${deviceAddress(dev)}",
+                                selected = selected == dev.id,
+                                enabled = !busy,
+                                onSelect = { selected = dev.id },
+                                status = state.deviceRuntimes[dev.id]?.status ?: DeviceStatus.UNKNOWN,
+                            )
+                        }
+                    }
+                    if (message.isNotBlank()) {
+                        Text(
+                            message,
+                            fontSize = 12.sp,
+                            color = if (busy) MaterialTheme.colors.onSurface.copy(alpha = 0.6f) else UiColors.Success,
+                            modifier = Modifier.padding(top = 10.dp),
+                        )
+                    }
+                }
+            } else {
+                RecallResultView(state, done)
+            }
+        },
+        confirmButton = {
+            if (done == null) {
+                Button(onClick = { startRecall() }, enabled = devices.isNotEmpty() && !busy) {
+                    Text(tr("plu.recall.start"))
+                }
+            } else {
+                Button(onClick = { onDone(done.total) }) { Text(tr("common.close")) }
+            }
+        },
+        dismissButton = {
+            if (done == null) {
+                TextButton(onClick = { if (!busy) onDismiss() }) { Text(tr("plu.back")) }
+            }
+        },
+    )
+}
+
+/** 一次回收的结果：按秤分组的商品列表 + 失败信息。 */
+private data class RecallOutcome(
+    val total: Int,
+    val byScale: List<Pair<ScaleDevice, List<PluItem>>>,
+    val failures: List<String>,
+)
+
+/** 回收结果视图：秤行（品牌·名称·IP）可点击展开该秤回收到的 PLU 明细列表。 */
+@Composable
+private fun RecallResultView(state: AppState, outcome: RecallOutcome) {
+    val expanded = remember { mutableStateMapOf<Long, Boolean>() }
+    Column(
+        modifier = Modifier
+            .width(540.dp)
+            .heightIn(max = 420.dp)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        if (outcome.byScale.isEmpty() && outcome.failures.isEmpty()) {
+            Text(
+                tr("plu.recall.noneScale"),
+                fontSize = 12.sp,
+                color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                modifier = Modifier.padding(vertical = 12.dp),
+            )
+        }
+        outcome.byScale.forEach { (dev, items) ->
+            val open = expanded[dev.id] ?: false
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(MaterialTheme.colors.primary.copy(alpha = 0.08f))
+                    .clickable { expanded[dev.id] = !open }
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(if (open) "▾" else "▸", fontSize = 12.sp)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "${dev.brand.displayName} · ${dev.name} · ${deviceAddress(dev)}",
+                    fontSize = 13.sp,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "${items.size}${tr("common.count")}",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
+                )
+            }
+            if (open) {
+                if (items.isEmpty()) {
+                    Text(
+                        tr("plu.recall.noneScale"),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colors.onSurface.copy(alpha = 0.55f),
+                        modifier = Modifier.padding(start = 24.dp, top = 4.dp, bottom = 4.dp),
+                    )
+                } else {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 3.dp)) {
+                        Text(tr("plu.field.pluNo"), Modifier.width(60.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text(tr("plu.field.name"), Modifier.weight(1f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text(tr("plu.field.price"), Modifier.width(80.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Text(tr("plu.field.code"), Modifier.width(110.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    items.forEach { p ->
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp)) {
+                            Text(p.pluNo.toString(), Modifier.width(60.dp), fontSize = 12.sp)
+                            Text(
+                                p.displayName.ifBlank { "-" },
+                                Modifier.weight(1f),
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                Numbers.minorToDisplay(p.unitPrice, state.config.priceDecimals),
+                                Modifier.width(80.dp),
+                                fontSize = 12.sp,
+                            )
+                            Text(
+                                p.eanCode.ifBlank { "-" },
+                                Modifier.width(110.dp),
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        outcome.failures.forEach { f ->
+            Text(f, fontSize = 12.sp, color = UiColors.Error, modifier = Modifier.padding(vertical = 2.dp))
+        }
+        Text(
+            "${tr("plu.recallDone")}${outcome.total}",
+            fontSize = 12.sp,
+            color = UiColors.Success,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
+/** 回收弹窗的可选行：单选圆点 + 名称 + 说明 + 可选在线状态点。 */
+@Composable
+private fun DevicePickRow(
+    label: String,
+    detail: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onSelect: () -> Unit,
+    status: DeviceStatus? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(4.dp))
+            .background(if (selected) MaterialTheme.colors.primary.copy(alpha = 0.10f) else Color.Transparent)
+            .clickable(enabled = enabled, onClick = onSelect)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        androidx.compose.material.RadioButton(selected = selected, onClick = onSelect, enabled = enabled)
+        if (status != null) {
+            StatusDot(status)
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(label, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.width(10.dp))
+        Text(
+            detail,
+            fontSize = 11.sp,
+            color = MaterialTheme.colors.onSurface.copy(alpha = 0.55f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }

@@ -44,6 +44,9 @@ interface IScaleDriver {
     /** Synchronize the scale's real-time clock to the host time. */
     suspend fun syncTime(): Result<Unit>
 
+    /** Read the scale's real-time clock (unsupported protocols return failure). */
+    suspend fun readTime(): Result<java.time.LocalDateTime>
+
     /** Download a label template / format definition. */
     suspend fun downloadLabelTemplate(template: LabelTemplate): Result<Unit>
 

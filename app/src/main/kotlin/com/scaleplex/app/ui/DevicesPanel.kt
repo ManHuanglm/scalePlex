@@ -74,12 +74,13 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
     var showGroupEditor by remember { mutableStateOf(false) }
     var batchResults by remember { mutableStateOf<Map<Long, BatchResult>?>(null) }
     var editorMessage by remember { mutableStateOf<String?>(null) }
+    var showTimeSync by remember { mutableStateOf(false) }
     val checked = remember { mutableStateListOf<Long>() }
     val scope = rememberCoroutineScope()
 
     val online = devices.count { state.deviceRuntimes[it.id]?.status == DeviceStatus.ONLINE }
     val table = rememberTableState(
-        listOf(36.dp, 90.dp, 150.dp, 110.dp, 110.dp, 220.dp, 220.dp),
+        listOf(36.dp, 84.dp, 60.dp, 122.dp, 56.dp, 100.dp, 100.dp, 96.dp, 80.dp, 148.dp, 200.dp),
     )
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -88,11 +89,7 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
             subtitle = "${tr("common.total")} ${devices.size}${tr("common.count")} · " +
                 "${tr("status.online")} $online · ${tr("plu.checkedCount")} ${checked.size}",
         ) {
-            OutlinedButton(onClick = {
-                scope.launch {
-                    state.scaleService.devices().forEach { dev -> state.scaleService.syncTime(dev) }
-                }
-            }) { Text(tr("device.syncTime")) }
+            OutlinedButton(onClick = { showTimeSync = true }) { Text(tr("device.syncTime")) }
             Button(onClick = {
                 editing = ScaleDevice(name = "", brand = ScaleBrand.DIGI, groupId = groupFilter ?: 0)
                 showEditor = true
@@ -202,6 +199,7 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
                         table = table,
                         d = d,
                         status = status,
+                        lastSeen = state.deviceRuntimes[d.id]?.lastSeen ?: 0L,
                         groupName = groupName,
                         checked = checked.contains(d.id),
                         onCheck = { c -> if (c) checked.add(d.id) else checked.remove(d.id) },
@@ -235,6 +233,9 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
         }
     }
 
+    if (showTimeSync) {
+        TimeSyncDialog(state, onDismiss = { showTimeSync = false })
+    }
     if (showEditor && editing != null) {
         DeviceEditorDialog(state, editing!!, groups, onDismiss = { showEditor = false }) {
             if (editing!!.id == 0L) state.scaleService.addDevice(it) else state.scaleService.updateDevice(it)
@@ -268,13 +269,17 @@ fun DevicesPanel(state: AppState, refresh: MutableState<Int>) {
     }
 }
 
-/** 设备表格列标题。 */
+/** 设备表格列标题（ScaleKey 风格密集网格）。 */
 private fun deviceHeaders(): List<String> = listOf(
     tr("device.field.status"),
-    tr("device.field.name"),
+    tr("device.field.no"),
+    tr("device.field.ip"),
+    tr("device.field.port"),
     tr("device.field.brand"),
+    tr("device.field.scaleType"),
     tr("device.field.group"),
-    tr("device.field.address"),
+    tr("device.field.comm"),
+    tr("device.field.infoTime"),
     tr("common.actions"),
 )
 
@@ -283,6 +288,7 @@ private fun DeviceTableRow(
     table: com.scaleplex.app.ui.table.TableState,
     d: ScaleDevice,
     status: DeviceStatus,
+    lastSeen: Long,
     groupName: String,
     checked: Boolean,
     onCheck: (Boolean) -> Unit,
@@ -306,27 +312,36 @@ private fun DeviceTableRow(
             1 -> Row(Modifier.cellPadding(), verticalAlignment = Alignment.CenterVertically) {
                 StatusDot(status)
                 Spacer(Modifier.width(6.dp))
-                Text(statusLabel(status), fontSize = 12.sp, maxLines = 1)
+                Text(statusLabel(status), fontSize = 11.sp, maxLines = 1)
             }
-            2 -> Text(d.name, Modifier.cellPadding(), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            3 -> Text(d.brand.displayName, Modifier.cellPadding(), fontSize = 12.sp, maxLines = 1)
-            4 -> Text(groupName, Modifier.cellPadding(), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            5 -> Text(deviceAddress(d), Modifier.cellPadding(), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            2 -> Text(scaleNoOf(d), Modifier.cellPadding(), fontSize = 11.sp, maxLines = 1)
+            3 -> Text(d.ip, Modifier.cellPadding(), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            4 -> Text(d.port.toString(), Modifier.cellPadding(), fontSize = 11.sp, maxLines = 1)
+            5 -> Text(d.brand.displayName, Modifier.cellPadding(), fontSize = 11.sp, maxLines = 1)
+            6 -> Text(d.model, Modifier.cellPadding(), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            7 -> Text(groupName, Modifier.cellPadding(), fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            8 -> Text(d.commType.name, Modifier.cellPadding(), fontSize = 11.sp, maxLines = 1)
+            9 -> Text(formatInfoTime(lastSeen), Modifier.cellPadding(), fontSize = 11.sp, maxLines = 1)
             else -> Row(Modifier.cellPadding(), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onEdit) { Text(tr("device.edit"), fontSize = 12.sp) }
+                TextButton(onClick = onEdit) { Text(tr("device.edit"), fontSize = 11.sp) }
                 // 托利多标签格式由专用编辑器维护：按机型启动 VisEdit / bLabel / SmartLabel
                 if (d.brand == ScaleBrand.METTLER_TOLEDO) {
                     TextButton(onClick = onLabelEditor) {
-                        Text(tr("device.labelEditor"), fontSize = 12.sp)
+                        Text(tr("device.labelEditor"), fontSize = 11.sp)
                     }
                 }
                 TextButton(onClick = onDelete) {
-                    Text(tr("device.delete"), fontSize = 12.sp, color = UiColors.Error)
+                    Text(tr("device.delete"), fontSize = 11.sp, color = UiColors.Error)
                 }
             }
         }
     }
 }
+
+/** 最近一次成功获取秤信息的时间（ScaleKey 风格 yyyy/MM/dd HH:mm:ss；无记录显示 -）。 */
+private fun formatInfoTime(lastSeen: Long): String =
+    if (lastSeen <= 0L) "-"
+    else java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss", java.util.Locale.ROOT).format(java.util.Date(lastSeen))
 
 @Composable
 private fun GroupEditorDialog(initial: ScaleGroup, onDismiss: () -> Unit, onSave: (ScaleGroup) -> Unit) {

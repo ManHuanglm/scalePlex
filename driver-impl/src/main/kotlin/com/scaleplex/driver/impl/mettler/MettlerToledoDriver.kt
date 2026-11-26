@@ -50,9 +50,42 @@ class MettlerToledoDriver(
                     Charsets.UTF_8,
                 )
             val resultFile = MtScaleKeyBridge.executeTask(taskDir, taskId).getOrElse { throw IllegalStateException(it.message) }
-            val status = MtScaleKeyXml.parseTaskResultXml(resultFile.readText(Charsets.UTF_8))[device.id]
-            val online = status?.ok == true || (status?.status in listOf("Complete", "Executing", "Output", "Prepare"))
+            val xml = resultFile.readText(Charsets.UTF_8)
+            // 关机真机校准：ScaleKey 服务层任务恒 Complete/OK/Succeeded=1，不能作为在线依据；
+            // 唯一权威是 DataFile 内 CheckOnline/Status（-1=离线）。无数据文件/无 CheckOnline 元素一律离线。
+            val online = run {
+                val dataFileName = MtScaleKeyXml.firstCommandDataFile(xml)
+                val checkStatus = dataFileName?.let {
+                    runCatching { File(resultFile.parentFile, it).readText(Charsets.UTF_8) }.getOrNull()
+                        ?.let { MtScaleKeyXml.parseCheckOnlineStatus(it) }
+                }
+                checkStatus != null && checkStatus >= 0
+            }
             ScaleStatus(online = online, model = device.model.ifBlank { "Mettler Toledo" })
+        }
+    }
+
+    /** 读取秤内实时时钟（DeviceTime Control=Read，真机校准 .231 bComS）。 */
+    override suspend fun readTime(): Result<java.time.LocalDateTime> = withContext(Dispatchers.IO) {
+        runCatching {
+            val taskId = MtScaleKeyXml.newTaskId()
+            val taskDir = newTaskDir(taskId)
+            File(taskDir, "DeviceList.xml").writeText(
+                MtScaleKeyXml.buildDeviceListXml(listOf(device), mapOf(device.id to "Commands.xml")), Charsets.UTF_8,
+            )
+            File(taskDir, "Commands.xml").writeText(
+                MtScaleKeyXml.buildCommandsXml(listOf(MtCommand(MtScaleKeyXml.CMD_DEVICE_TIME, control = "Read"))),
+                Charsets.UTF_8,
+            )
+            File(taskDir, "Task.xml").writeText(
+                MtScaleKeyXml.buildTaskXml(taskId, MtScaleKeyXml.TASK_TYPE_DOWNLOAD, "DeviceList.xml"), Charsets.UTF_8,
+            )
+            val resultFile = MtScaleKeyBridge.executeTask(taskDir, taskId).getOrElse { throw IllegalStateException(it.message) }
+            val xml = resultFile.readText(Charsets.UTF_8)
+            val dataFileName = MtScaleKeyXml.firstCommandDataFile(xml)
+                ?: error("DeviceTime 读取无数据文件（命令未执行成功）")
+            val dataXml = File(resultFile.parentFile, dataFileName).readText(Charsets.UTF_8)
+            MtScaleKeyXml.parseDeviceTime(dataXml) ?: error("DeviceTime 数据解析失败: ${dataXml.take(200)}")
         }
     }
 
@@ -221,7 +254,7 @@ class MettlerToledoDriver(
         files.forEach { (name, content) ->
             File(taskDir, name).writeText(content, Charsets.UTF_8)
         }
-        log.info("MT task {} -> {}", taskId, taskDir.absolutePath)
+        log.info("MT task {} -> {} device={} model={} ip={}", taskId, taskDir.absolutePath, device.name, device.model, device.ip)
         val resultFile = MtScaleKeyBridge.executeTask(taskDir, taskId).getOrElse { return Result.failure(IllegalStateException(it.message)) }
         return Result.success(MtScaleKeyBridge.parseResult(resultFile, listOf(device), total))
     }

@@ -45,9 +45,16 @@ class AppState(
     val tradeLogService = TradeLogService(db)
 
     var config: ScaleConfig by mutableStateOf(config)
-    var darkMode by mutableStateOf(false)
+    var darkMode by mutableStateOf(config.darkMode)
     val bgColor get() = if (darkMode) androidx.compose.ui.graphics.Color(0xFF1E1F22)
                         else androidx.compose.ui.graphics.Color(0xFFF5F6F8)
+
+    /** 切换深色模式并持久化到配置（app_config.darkMode）。 */
+    fun applyDarkMode(enabled: Boolean) {
+        darkMode = enabled
+        config = config.copy(darkMode = enabled)
+        configService.save(config)
+    }
 
     /** Selected left-tab index. */
     var selectedTab by mutableStateOf(0)
