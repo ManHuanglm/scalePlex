@@ -13,9 +13,6 @@ import com.scaleplex.driver.api.AbstractScaleDriver
 import com.scaleplex.driver.api.ScaleStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
  * Dahua 大华 TCP driver (port 4001). Second priority domestic brand.
@@ -34,8 +31,6 @@ class DahuaTcpDriver(
 ) : AbstractScaleDriver() {
 
     override val brand: ScaleBrand = ScaleBrand.DAHUA
-
-    private val timeFmt = SimpleDateFormat("yyMMddHHmmss", Locale.ROOT)
 
     // Dahua PLU version from device config (default TMA_07 = 3)
     private val pluVersion: Int = device.note.toIntOrNull() ?: 3
@@ -105,14 +100,13 @@ class DahuaTcpDriver(
         }
     }
 
-    override suspend fun syncTime(): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            val now = timeFmt.format(Date())
-            val cmd = "!0VTIME$now\r\n"
-            transport.send(cmd.toByteArray(Charsets.US_ASCII))
-            Unit
-        }
-    }
+    /**
+     * 大华校时：官方 DLL 全部导出仅 5 个 PLU 函数（dhSendPluDefault/dhRcvRdDefault/
+     * dhGetObjPlu/dhGetObjPluText/dhGetDllVersion），无时间接口；`!0VTIME` 帧真机
+     * （TMA_07 @192.168.0.150）无应答，待协议标定（协议.rar 抓包）后实现。
+     */
+    override suspend fun syncTime(): Result<Unit> =
+        Result.failure(UnsupportedOperationException("大华校时待协议标定（官方 DLL 无时间接口，!0VTIME 帧真机无应答）"))
 
     override suspend fun readTradeLog(): Result<List<TradeRecord>> = withContext(Dispatchers.IO) {
         runCatching {
