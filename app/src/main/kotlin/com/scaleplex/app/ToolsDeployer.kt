@@ -36,6 +36,8 @@ object ToolsDeployer {
         ),
         // 容大 RLS1000（官方 32 位通信 DLL + DLL 配置 + PLU 回收桥接）
         "rongta" to listOf("rtslabelscale.dll", "SYSTEM.CFG", "RongtaPluBridge.exe"),
+        // 友声 JH 族（官方 32 位通信 DLL + DLL 配置 + 全功能桥接）
+        "yousheng" to listOf("JHScale.dll", "JHScale.ini", "YouShengBridge.exe"),
     )
 
     /** 释放全部品牌工具，返回工具根目录（`<dataDir>/tools`）。 */

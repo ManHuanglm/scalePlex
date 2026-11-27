@@ -32,8 +32,8 @@ import java.net.Socket
  * 探测顺序（从轻到重，外部工具未配置的自动跳过）：
  * 1. 寺冈 ETP 族（SM-120）：FTP 21 可 admin 登录（无需外部工具）；
  * 2. 寺冈 b 族（SM-110N/SM-5100）：SMScaleAPI ConnectScale（端口 = 2000 + IP 尾段）；
- * 3. 友声：TCP 4001 状态帧 ACK（协议与大华共用端口，帧格式区分）；
- * 4. 大华：TCP 4001 任意应答（友声帧未命中时兜底）；
+ * 3. 友声：JHScale 桥接连接 TCP 33571（2026-11-27 标定端口）；
+ * 4. 大华：TCP 4001 任意应答（友声未命中时兜底）；
  * 5. 托利多：TCP 3001 预检 + ScaleKey CheckOnline（按 ScaleType 候选逐个尝试）；
  * 6. 顶尖：AclasSDK GetDevicesInfo（设备名即型号）；
  * 7. 凯士：TCP 20304 端口指纹（CAS 默认端口，CL 族私有协议无公开规范）；
@@ -53,8 +53,11 @@ object ScaleAutoDetector {
     /** 单端口 TCP 连通性探测超时。 */
     private const val PORT_PROBE_TIMEOUT_MS = 1500
 
-    /** 大华 / 友声默认端口（共用 4001，以协议帧区分）。 */
+    /** 大华默认端口（4001；友声已标定独立端口 33571，此口仅作大华指纹）。 */
     private const val DAHUA_YOUSHENG_PORT = 4001
+
+    /** 友声 JH 族 TCP 通讯口（真机校准 2026-11-27；DLL 内置默认 33581，实秤为 33571）。 */
+    private const val YOUSHENG_DEFAULT_PORT = 33571
 
     /** 托利多 ScaleKey 设备端口。 */
     private const val MT_DEFAULT_PORT = 3001
@@ -96,6 +99,7 @@ object ScaleAutoDetector {
                 MT_DEFAULT_PORT,
                 ACLAS_DEFAULT_PORT,
                 DAHUA_YOUSHENG_PORT,
+                YOUSHENG_DEFAULT_PORT,
                 CAS_DEFAULT_PORT,
                 9100, 25, 110, 143,
                 2000 + lastSegment,
@@ -138,19 +142,23 @@ object ScaleAutoDetector {
         )
     }
 
-    /** 友声 / 大华（共用 4001）：先友声协议帧（需 ACK 命中），再大华任意应答兜底。 */
+    /**
+     * 友声 / 大华：友声先经 JHScale 桥接探测 33571（2026-11-27 标定端口），再大华 4001 任意应答兜底。
+     */
     private suspend fun detectYouShengOrDahua(ip: String, openPorts: Set<Int>): ScaleDetection? {
-        if (DAHUA_YOUSHENG_PORT !in openPorts) return null
-        val youShengDev = tempDevice(ip, DAHUA_YOUSHENG_PORT, ScaleBrand.YOUSHENG, CommType.TCP)
-        val youShengOnline = runCatching {
-            YouShengDriver(youShengDev).getStatus().getOrNull()?.online == true
-        }.getOrDefault(false)
-        if (youShengOnline) {
-            return ScaleDetection(
-                ScaleBrand.YOUSHENG, "", DAHUA_YOUSHENG_PORT, CommType.TCP,
-                "友声状态帧 ACK（4001）",
-            )
+        if (YOUSHENG_DEFAULT_PORT in openPorts) {
+            val youShengDev = tempDevice(ip, YOUSHENG_DEFAULT_PORT, ScaleBrand.YOUSHENG, CommType.TCP)
+            val youShengOnline = runCatching {
+                YouShengDriver(youShengDev).getStatus().getOrNull()?.online == true
+            }.getOrDefault(false)
+            if (youShengOnline) {
+                return ScaleDetection(
+                    ScaleBrand.YOUSHENG, "", YOUSHENG_DEFAULT_PORT, CommType.TCP,
+                    "JHScale 桥接连接成功（33571）",
+                )
+            }
         }
+        if (DAHUA_YOUSHENG_PORT !in openPorts) return null
         val dahuaDev = tempDevice(ip, DAHUA_YOUSHENG_PORT, ScaleBrand.DAHUA, CommType.TCP)
         val dahuaOnline = runCatching {
             DahuaTcpDriver(dahuaDev).getStatus().getOrNull()?.online == true

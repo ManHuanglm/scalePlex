@@ -15,6 +15,7 @@ local.properties
 *.exe
 # 自研工具链桥接（功能必需，随应用分发）
 !app/src/main/resources/tools/rongta/RongtaPluBridge.exe
+!app/src/main/resources/tools/yousheng/YouShengBridge.exe
 # 大华 DLL 运行时产物（不入库）
 app/src/main/resources/tools/dahua/dhip.ini
 app/src/main/resources/tools/dahua/dhplupathname.ini
