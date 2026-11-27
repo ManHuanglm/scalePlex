@@ -26,6 +26,11 @@ object ToolsDeployer {
             "MTLogger.dll", "MTJson.dll", "MTEncrypt.dll", "TransferEth.dll",
             "msvcp100.dll", "msvcr100.dll", "MTScaleKey.config",
         ),
+        // 凯士 CL 族（.NET 桥接库 + plustruct schema，config/ 子目录）
+        "cas" to listOf(
+            "CasLib.dll", "CasComm.dll", "AppSetting.dll", "Cl5k.dll", "CommManager.dll",
+            "DBManager.dll", "config/plustruct.str",
+        ),
     )
 
     /** 释放全部品牌工具，返回工具根目录（`<dataDir>/tools`）。 */
@@ -36,6 +41,7 @@ object ToolsDeployer {
             val dir = File(toolsDir, brand).apply { mkdirs() }
             files.forEach { name ->
                 val target = File(dir, name)
+                target.parentFile?.mkdirs()
                 val res = loader.getResourceAsStream("tools/$brand/$name") ?: return@forEach
                 // 缺失或大小不一致时释放（覆盖旧版本）
                 if (!target.exists() || target.length() != res.available().toLong()) {

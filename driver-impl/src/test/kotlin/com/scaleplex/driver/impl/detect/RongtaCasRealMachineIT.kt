@@ -8,12 +8,19 @@ import com.scaleplex.driver.impl.cas.CasClDriver
 import com.scaleplex.driver.impl.rongta.RongtaUdpDriver
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
+import java.io.File
 
 /**
  * 容大/凯士真机驱动在线探测测试（ScalePlex 已入库设备）。
  * 秤不可达时自动跳过；不进入常规测试集。
  */
 class RongtaCasRealMachineIT {
+
+    init {
+        // 帧生成回退需要数据目录（ plustruct.str 副本位于 <data>/tools/cas/config）；
+        // gradle test 工作目录是模块目录，data 在项目根
+        System.setProperty("scaleplex.data.dir", File("../data").canonicalPath)
+    }
 
     private fun rongta() = ScaleDevice(
         id = 7,
