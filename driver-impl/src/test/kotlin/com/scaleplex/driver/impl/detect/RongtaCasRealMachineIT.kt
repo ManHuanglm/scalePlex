@@ -176,4 +176,27 @@ class RongtaCasRealMachineIT {
         checkNotNull(plu1) { "回收结果缺 PLU1: ${list.take(10).map { it.pluNo }}" }
         println("cas PLU1: $plu1")
     }
+
+    /** 容大 PLU 回收（真机：官方 rtslabelscale.dll 桥接，UDP 5001 会话 + JSON 回调）。 */
+    @Test
+    fun `rongta plu upload`() = runBlocking {
+        val drv = RongtaUdpDriver(rongta())
+        if (drv.getStatus().getOrNull()?.online != true) {
+            org.junit.Assume.assumeTrue("容大秤 192.168.0.96 不可达，跳过", false)
+        }
+        // IT 环境：指向真机验证过的安装目录（含 rtslabelscale.dll + SYSTEM.CFG + RongtaPluBridge.exe）
+        System.setProperty(RongtaUdpDriver.TOOLS_PATH_PROPERTY, "E:\\Program Files (x86)\\RLS1000")
+        try {
+            val r = drv.uploadPlu()
+            println("rongta upload failure=${r.exceptionOrNull()?.message}")
+            val list = r.getOrThrow()
+            println("rongta upload count=${list.size}")
+            check(list.isNotEmpty()) { "容大回收结果为空" }
+            val plu1 = list.firstOrNull { it.pluNo == 1 }
+            checkNotNull(plu1) { "回收结果缺 PLU1" }
+            println("rongta PLU1: $plu1")
+        } finally {
+            System.clearProperty(RongtaUdpDriver.TOOLS_PATH_PROPERTY)
+        }
+    }
 }

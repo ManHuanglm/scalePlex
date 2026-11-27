@@ -31,6 +31,8 @@ object ToolsDeployer {
             "CasLib.dll", "CasComm.dll", "AppSetting.dll", "Cl5k.dll", "CommManager.dll",
             "DBManager.dll", "config/plustruct.str",
         ),
+        // 容大 RLS1000（官方 32 位通信 DLL + DLL 配置 + PLU 回收桥接）
+        "rongta" to listOf("rtslabelscale.dll", "SYSTEM.CFG", "RongtaPluBridge.exe"),
     )
 
     /** 释放全部品牌工具，返回工具根目录（`<dataDir>/tools`）。 */

@@ -10,6 +10,7 @@ import com.scaleplex.driver.api.AbstractScaleDriver
 import com.scaleplex.driver.api.ScaleStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
@@ -33,7 +34,10 @@ import java.nio.charset.Charset
  * 校时（秤屏/标签打印时间实测同步），秤端回 0x02 ACK；**绝不能补发会话结束帧 0E 02**
  * ——空会话提交会把秤端 PLU 表清空（真机实验证实）。
  *
- * 待标定：PLU 回收/删除、流水回收/清空、标签格式下发/回收帧类型。
+ * PLU 回收（真机破解 2026-11-27）：官方 rtslabelscale.dll 桥接（内置 32 位
+ * RongtaPluBridge.exe，UDP 5001 双向会话 + JSON 回调），uploadPlu 已实现。
+ *
+ * 待标定：PLU 删除/清空、流水回收/清空、标签格式下发/回收帧类型。
  */
 class RongtaUdpDriver(
     private val device: ScaleDevice,
@@ -93,8 +97,77 @@ class RongtaUdpDriver(
     override suspend fun deleteAllPlu(): Result<Unit> =
         Result.failure(UnsupportedOperationException("容大清空 PLU 帧类型待抓包标定"))
 
-    override suspend fun uploadPlu(): Result<List<PluItem>> =
-        Result.failure(UnsupportedOperationException("容大 PLU 回收协议待抓包标定"))
+    /**
+     * PLU 批量回收（真机破解 2026-11-27 @192.168.0.96，官方 rtslabelscale.dll 桥接）。
+     *
+     * 协议（pktmon 抓包标定）：上传 = UDP 5001 双向会话，PC 发 `0E 03 00 {slot:int16 LE}{0x80}`
+     * 逐槽请求，秤回 `0E 03 00`+64B 记录（布局同下发帧子记录）或 `FF` 填充空槽；官方 DLL 内部
+     * 完成开场/槽位探测/结束帧编排，逐条回调 JSON（LFCode/PluName/UnitPrice(分)/Deptment/
+     * ShlefTime/BarCode 等字段）。DLL 的 V2.0.1 demo 回调在托管宿主下不稳定，故内置 32 位
+     * 桥接 RongtaPluBridge.exe（C# P/Invoke，CWD=工具目录）：NDJSON 文件输出，退出码 = 回收
+     * 条数（<0 失败）。
+     */
+    override suspend fun uploadPlu(): Result<List<PluItem>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val toolsDir = locateToolsDir()
+            checkNotNull(toolsDir) {
+                "容大工具目录未找到（需 rtslabelscale.dll + SYSTEM.CFG + RongtaPluBridge.exe，" +
+                    "可用系统属性 ${TOOLS_PATH_PROPERTY} 指定）"
+            }
+            val exe = File(toolsDir, BRIDGE_EXE)
+            val out = File.createTempFile("scaleplex-rongta-plu", ".ndjson")
+            out.deleteOnExit()
+            val proc = ProcessBuilder(exe.absolutePath, device.ip, out.absolutePath)
+                .directory(toolsDir)
+                .redirectErrorStream(true)
+                .start()
+            if (!proc.waitFor(UPLOAD_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                proc.destroyForcibly()
+                error("容大回收超时 (${UPLOAD_TIMEOUT_MS}ms)")
+            }
+            val output = proc.inputStream.readBytes().toString(Charset.defaultCharset())
+            val exit = proc.exitValue()
+            log.info("Rongta upload {}: exit={} {}", device.ip, exit, output.take(200))
+            if (exit < 0) error("容大回收失败 (exit=$exit): ${output.take(200)}")
+            out.readText(Charsets.UTF_8).lineSequence().mapNotNull(::parsePluJson).toList()
+        }
+    }
+
+    /**
+     * 解析桥接输出的单行 PLU JSON → [PluItem]。官方字段集，价格单位 = 分；
+     * RLS1000 回收条目 WeightUnit 恒为 4（称重），weightFlag 恒 0。
+     */
+    internal fun parsePluJson(line: String): PluItem? {
+        if (!line.contains("\"LFCode\"")) return null
+        val num = { key: String ->
+            Regex("\"$key\"\\s*:\\s*(-?\\d+)").find(line)?.groupValues?.get(1)?.toIntOrNull()
+        }
+        val str = { key: String ->
+            Regex("\"$key\"\\s*:\\s*\"([^\"]*)\"").find(line)?.groupValues?.get(1)
+        }
+        val pluNo = num("LFCode") ?: return null
+        val barCode = num("BarCode") ?: 0
+        return PluItem(
+            pluNo = pluNo,
+            name = str("PluName") ?: "",
+            weightFlag = 0,
+            mainGroup = num("Deptment") ?: 0,
+            unitPrice = (num("UnitPrice") ?: 0).toLong(),
+            usedByDate = num("ShlefTime") ?: 0,
+            eanCode = if (barCode > 0) barCode.toString() else "",
+        )
+    }
+
+    /** 工具目录：系统属性 scaleplex.rongta.tools → data/tools/rongta（ToolsDeployer 释放）→ 默认安装目录。 */
+    private fun locateToolsDir(): File? {
+        System.getProperty(TOOLS_PATH_PROPERTY, "").takeIf { it.isNotBlank() }
+            ?.let { return File(it) }
+        val dataDir = System.getProperty(DATA_DIR_PROPERTY, "").takeIf { it.isNotBlank() }
+            ?: (System.getProperty("user.home") + File.separator + ".scaleplex")
+        val deployed = File(File(dataDir), "tools${File.separator}rongta")
+        if (File(deployed, BRIDGE_EXE).exists()) return deployed
+        return DEFAULT_TOOLS_DIR.takeIf { File(it, BRIDGE_EXE).exists() }?.let { File(it) }
+    }
 
     override suspend fun readLabelFormats(): Result<List<LabelTemplate>> =
         Result.failure(UnsupportedOperationException("容大标签格式回收待标定（RTPLU 的 .scr 标签文件格式已定位）"))
@@ -275,6 +348,8 @@ class RongtaUdpDriver(
         ean.filter { it.isDigit() }.take(9).toIntOrNull()?.and(0xFF) ?: 0
 
     companion object {
+        private val log = org.slf4j.LoggerFactory.getLogger(RongtaUdpDriver::class.java)
+
         private const val PROBE_WAIT_MS = 300L
         private const val FRAME_SIZE = 257
         private const val SLOT_SIZE = 64
@@ -283,5 +358,19 @@ class RongtaUdpDriver(
         private const val FRAME_GAP_MS = 5L
         private const val ACK_TIMEOUT_MS = 300L
         private const val ACK_BYTE: Byte = 0x02
+
+        /** 桥接可执行文件名（32 位 csc 编译产物，与 rtslabelscale.dll 同目录）。 */
+        private const val BRIDGE_EXE = "RongtaPluBridge.exe"
+
+        /** 容大工具目录系统属性（覆盖 ToolsDeployer 释放目录）。 */
+        const val TOOLS_PATH_PROPERTY = "scaleplex.rongta.tools"
+
+        private const val DATA_DIR_PROPERTY = "scaleplex.data.dir"
+
+        /** 开发期默认：容大原厂软件安装目录（真机验证环境）。 */
+        private const val DEFAULT_TOOLS_DIR = "E:\\Program Files (x86)\\RLS1000"
+
+        /** 回收超时（数百条 PLU 的 UDP 会话 + DLL 编排）。 */
+        private const val UPLOAD_TIMEOUT_MS = 180_000L
     }
 }
