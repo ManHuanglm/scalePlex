@@ -111,12 +111,12 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
     var showEditor by remember { mutableStateOf(false) }
     var showCategory by remember { mutableStateOf(false) }
     var showRecall by remember { mutableStateOf(false) }
+    var showDownloadPick by remember { mutableStateOf(false) }
     var batchResults by remember { mutableStateOf<Map<Long, BatchResult>?>(null) }
     var recallMessage by remember { mutableStateOf("") }
     var selectedPluNo by remember { mutableStateOf<Int?>(null) }
     var inlineEdit by remember { mutableStateOf<InlineEdit?>(null) }
     var inlineMessage by remember { mutableStateOf("") }
-    val scope = rememberCoroutineScope()
     val density = LocalDensity.current
 
     /** 提交单格编辑：解析失败或保存失败时保留列表原值并提示原因。 */
@@ -165,13 +165,8 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
                 showEditor = true
             }) { Text(tr("plu.add")) }
             Button(onClick = {
-                scope.launch {
-                    // 勾选为空时下发当前筛选结果（参考银豹：勾选商品 → 下发传秤）
-                    val targets = plus.filter { checked.contains(it.pluNo) }.ifEmpty { plus }
-                    batchResults = state.scaleService.downloadToDevices(
-                        state.scaleService.devices().filter { it.enabled }, targets,
-                    )
-                }
+                // 先弹窗选择要下发的秤（全部启用秤或某一台），确认后再批量下发
+                showDownloadPick = true
             }) { Text(tr("plu.download.selected")) }
         }
 
@@ -429,6 +424,14 @@ fun PluPanel(state: AppState, refresh: MutableState<Int>) {
             refresh.value++
         }
     }
+    if (showDownloadPick) {
+        // 勾选为空时下发当前筛选结果（参考银豹：勾选商品 → 下发传秤）
+        val plusTargets = plus.filter { checked.contains(it.pluNo) }.ifEmpty { plus }
+        DownloadDevicesDialog(state, plusTargets, onDismiss = { showDownloadPick = false }) { results ->
+            batchResults = results
+            showDownloadPick = false
+        }
+    }
     batchResults?.let {
         BatchResultDialog(state, it, onDismiss = { batchResults = null })
     }
@@ -666,6 +669,87 @@ private fun barcodeTypeLabel(p: PluItem): String = when (p.barcodeType) {
 private fun summarize(lines: List<com.scaleplex.core.model.PluTextLine>): String {
     val first = lines.firstOrNull()?.text ?: return "-"
     return if (first.length > 10) first.take(10) + "…" else first
+}
+
+/**
+ * 下发选秤弹窗：单选目标秤（全部启用秤或某一台，默认第一台在线秤），确认后批量下发，
+ * 结果交由 BatchResultDialog 按秤展示成功/失败明细。
+ */
+@Composable
+private fun DownloadDevicesDialog(
+    state: AppState,
+    plusTargets: List<PluItem>,
+    onDismiss: () -> Unit,
+    onDone: (Map<Long, BatchResult>) -> Unit,
+) {
+    val devices = remember { state.scaleService.devices().filter { it.enabled } }
+    // -1 = 全部设备；否则为选中的设备 id（默认第一台在线秤）
+    var selected by remember {
+        mutableStateOf(devices.firstOrNull { state.deviceRuntimes[it.id]?.status == DeviceStatus.ONLINE }?.id ?: devices.firstOrNull()?.id)
+    }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    fun startDownload() {
+        busy = true
+        scope.launch {
+            val targets = if (selected == -1L) devices else devices.filter { it.id == selected }
+            val results = state.scaleService.downloadToDevices(targets, plusTargets)
+            busy = false
+            onDone(results)
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text(tr("plu.download.title")) },
+        text = {
+            Column(modifier = Modifier.width(420.dp)) {
+                if (devices.isEmpty()) {
+                    Text(
+                        tr("plu.download.empty"),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(vertical = 12.dp),
+                    )
+                } else {
+                    DevicePickRow(
+                        label = tr("plu.download.all"),
+                        detail = "${devices.size}${tr("common.count")}",
+                        selected = selected == -1L,
+                        enabled = !busy,
+                        onSelect = { selected = -1L },
+                    )
+                    devices.forEach { dev ->
+                        DevicePickRow(
+                            label = dev.name.ifBlank { dev.model },
+                            detail = "${dev.brand.displayName} · ${deviceAddress(dev)}",
+                            selected = selected == dev.id,
+                            enabled = !busy,
+                            onSelect = { selected = dev.id },
+                            status = state.deviceRuntimes[dev.id]?.status ?: DeviceStatus.UNKNOWN,
+                        )
+                    }
+                }
+                if (busy) {
+                    Text(
+                        tr("plu.download.downloading"),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { startDownload() }, enabled = devices.isNotEmpty() && !busy) {
+                Text(tr("plu.download.start"))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = { if (!busy) onDismiss() }) { Text(tr("plu.back")) }
+        },
+    )
 }
 
 /**
