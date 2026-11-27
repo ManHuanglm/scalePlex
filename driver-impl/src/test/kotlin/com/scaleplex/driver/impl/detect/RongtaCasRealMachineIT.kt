@@ -94,4 +94,47 @@ class RongtaCasRealMachineIT {
         println("cas download: $r")
         check(r.isSuccess) { "凯士下发失败: ${r.exceptionOrNull()?.message}" }
     }
+
+    /** 批量测试数据：PLU 1 幂等复跑，PLU 2/3 覆盖秤内基线同号商品（香菜/小白菜）。 */
+    private fun batchPlus() = listOf(
+        baiCai(),
+        baiCai().copy(pluNo = 2, name = "香菜", unitPrice = 850),
+        baiCai().copy(pluNo = 3, name = "小白菜", unitPrice = 500),
+    )
+
+    @Test
+    fun `rongta multi plu download`() = runBlocking {
+        val drv = RongtaUdpDriver(rongta())
+        if (drv.getStatus().getOrNull()?.online != true) {
+            org.junit.Assume.assumeTrue("容大秤 192.168.0.96 不可达，跳过", false)
+        }
+        val r = drv.downloadPluBatch(batchPlus())
+        println("rongta multi download: $r")
+        check(r.isSuccess) { "容大多条下发失败: ${r.exceptionOrNull()?.message}" }
+        check(r.getOrThrow().success == 3) { "容大多条下发数量不符: ${r.getOrThrow()}" }
+    }
+
+    @Test
+    fun `cas multi plu download`() = runBlocking {
+        val drv = CasClDriver(cas())
+        if (drv.getStatus().getOrNull()?.online != true) {
+            org.junit.Assume.assumeTrue("凯士秤 192.168.0.111 不可达，跳过", false)
+        }
+        val r = drv.downloadPluBatch(batchPlus().map { it.copy(mainGroup = 1) })
+        println("cas multi download: $r")
+        check(r.isSuccess) { "凯士多条下发失败: ${r.exceptionOrNull()?.message}" }
+        check(r.getOrThrow().success == 3) { "凯士多条下发数量不符: ${r.getOrThrow()}" }
+    }
+
+    /** 时间同步当前两品牌均未接入，验证驱动返回明确的 UnsupportedOperationException 而非崩溃。 */
+    @Test
+    fun `sync time not wired behavior`() = runBlocking {
+        val rongta = RongtaUdpDriver(rongta()).syncTime()
+        val cas = CasClDriver(cas()).syncTime()
+        println("rongta syncTime: $rongta")
+        println("cas syncTime: $cas")
+        check(rongta.isFailure && cas.isFailure) { "时间同步应返回失败结果（待接入）" }
+        check(rongta.exceptionOrNull() is UnsupportedOperationException) { "容大应抛 UnsupportedOperationException" }
+        check(cas.exceptionOrNull() is UnsupportedOperationException) { "凯士应抛 UnsupportedOperationException" }
+    }
 }
