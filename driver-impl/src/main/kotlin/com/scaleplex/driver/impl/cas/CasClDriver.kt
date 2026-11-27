@@ -32,7 +32,8 @@ import java.nio.charset.Charset
  * 在线探测 = Open + IsOpen 组合；PLU 下发 = PowerShell 桥接官方库（CasLib/Cl5k/CommManager）
  * 生成协议帧 + Kotlin 裸 TCP 20304 逐帧发送（真机验证 W02:O，2026-11-27）。
  * 手工逆向 ASCII 帧秤端一律拒绝（W02:EFE），字段集由官方 PluSchema 控制（见 buildFrameScript）；
- * 回收/删除/时间同步走 CommManager.AppCommManager + Cl5k（待接入）。
+ * 时间同步/读时间 = Cl5k.ScaleDate 帧桥接（真机验证 2026-11-27，ACK W45:O01）；
+ * 回收/删除待接入。
  *
  * 前置条件：系统属性 `scaleplex.cas.tools` 指向含 CasComm.dll/CasLib.dll/Cl5k.dll/CommManager.dll/
  * DBManager.dll 及 config\plustruct.str 的 CL-Works 目录。
@@ -175,6 +176,136 @@ class CasClDriver(
         return frames
     }
 
+    /** 读取秤端应答直到出现指定标记（超时返回已收内容，ISO_8859_1 文本）。 */
+    private fun readReplyText(inp: java.io.InputStream, marker: String): String {
+        val deadline = System.currentTimeMillis() + RESPONSE_TIMEOUT_MS
+        val buf = ByteArray(4096)
+        var acc = ByteArray(0)
+        while (System.currentTimeMillis() < deadline) {
+            val n = try {
+                inp.read(buf)
+            } catch (_: java.net.SocketTimeoutException) {
+                return String(acc, Charsets.ISO_8859_1)
+            }
+            if (n <= 0) break
+            acc += buf.copyOf(n)
+            if (String(acc, Charsets.ISO_8859_1).contains(marker)) break
+        }
+        return String(acc, Charsets.ISO_8859_1)
+    }
+
+    /**
+     * 解析时间回包：取首个 `(`（0x28 帧尾 BCC 分隔）前的包，提取
+     * `Y/M/D/h/m/s={X2}.` 十六进制字段（Y 为年-2000）。
+     */
+    private fun parseClTime(text: String): java.time.LocalDateTime? {
+        val packet = text.substringBefore("(")
+        val field = { code: String ->
+            Regex("$code=([0-9A-Fa-f]{2})\\.").find(packet)?.groupValues?.get(1)?.toInt(16)
+        }
+        val year = field("Y") ?: return null
+        val month = field("M") ?: return null
+        val day = field("D") ?: return null
+        val hour = field("h") ?: return null
+        val minute = field("m") ?: return null
+        val second = field("s") ?: return null
+        return try {
+            java.time.LocalDateTime.of(2000 + year, month, day, hour, minute, second)
+        } catch (_: java.time.DateTimeException) {
+            null
+        }
+    }
+
+    /**
+     * 通过桥接脚本生成时间同步/读时间帧（真机校准 2026-11-27）：
+     * Scales.Open 真握手 → m_mapClients 反射取 Client → DateInfo(nNo=1) →
+     * Cl5k.ScaleDate.Make4Upload/Make4Download → [int32 长度][帧] 流文件。
+     * 手工构造的 IConnect 桩会被 Make4Download 拒绝（-1003），必须用真实 Client。
+     */
+    private fun generateDateFramesViaBridge(includeDownload: Boolean): List<ByteArray> {
+        val tmp = File(System.getProperty("java.io.tmpdir"))
+        val outBin = File(tmp, "scaleplex-cas-date-frames.bin")
+        val ps1 = File(tmp, "scaleplex-cas-date.ps1")
+        // PowerShell 5.1 对无 BOM 的 .ps1 按 ANSI(GBK) 解读，必须 UTF-8 + BOM
+        val bom = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
+        ps1.writeBytes(bom + buildDateFrameScript(includeDownload, outBin).toByteArray(Charsets.UTF_8))
+        val configuredPs = System.getProperty(POWERSHELL_PROPERTY, "").takeIf { it.isNotBlank() }
+        val ps = if (configuredPs != null) File(configuredPs) else DEFAULT_POWERSHELL
+        val process = ProcessBuilder(
+            ps.absolutePath, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1.absolutePath,
+        )
+            .apply {
+                environment()[CAS_TOOLS_ENV] = toolsDir()
+                System.getProperty("scaleplex.data.dir")?.let { environment()[DATA_DIR_ENV] = it }
+            }
+            .redirectErrorStream(true)
+            .start()
+        if (!process.waitFor(DATE_GEN_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+            process.destroyForcibly()
+            error("凯士时间帧生成超时 (${DATE_GEN_TIMEOUT_MS}ms)")
+        }
+        val output = process.inputStream.readBytes().toString(Charset.defaultCharset())
+        log.info("CAS date frame gen {}: {}", device.ip, output.take(300))
+        if (process.exitValue() != 0 || !output.contains("FRAMES_OK")) {
+            error("凯士时间帧生成失败 (exit=${process.exitValue()}): ${output.take(300)}")
+        }
+        return parseFrameStream(outBin.readBytes())
+    }
+
+    /** 时间帧生成脚本：真握手 + 反射 Client + DateInfo + Make4Upload/Make4Download。 */
+    private fun buildDateFrameScript(includeDownload: Boolean, outBin: File): String {
+        val outPath = outBin.absolutePath.replace("'", "''")
+        val tools = toolsDir().replace("'", "''")
+        val ip = device.ip.trim().replace("'", "''")
+        val port = device.port
+        val protoType = protocolTypeOf(device.model)
+        val makeCall = if (includeDownload) {
+            "|${'$'}frame = [Cl5k.ScaleDate]::Make4Download(0, ${'$'}conn, ${'$'}di, [ref]${'$'}nResult)"
+        } else {
+            "|${'$'}frame = [Cl5k.ScaleDate]::Make4Upload(0, ${'$'}conn, ${'$'}di, [ref]${'$'}nResult)"
+        }
+        return """
+            |${'$'}ErrorActionPreference = 'Stop'
+            |${'$'}tools = ${'$'}env:SCALEPLEX_CAS_TOOLS
+            |Set-Location ${'$'}tools
+            |[void][Reflection.Assembly]::LoadFrom("${'$'}tools\CasLib.dll")
+            |[void][Reflection.Assembly]::LoadFrom("${'$'}tools\CasComm.dll")
+            |[void][Reflection.Assembly]::LoadFrom("${'$'}tools\AppSetting.dll")
+            |[void][Reflection.Assembly]::LoadFrom("${'$'}tools\Cl5k.dll")
+            |${'$'}onRecv = [Cas.Scale.DataReceiveDelegate]{ param(${'$'}recv, ${'$'}data) }
+            |${'$'}onState = [Cas.Scale.DataReceiveDelegate]{ param(${'$'}recv, ${'$'}data) }
+            |${'$'}scales = New-Object Cas.CasIOLib.Scales(0, "${'$'}tools\config", ${'$'}onRecv, ${'$'}onState)
+            |${'$'}r = ${'$'}scales.Open($protoType, 'V3.02.7', '$ip', $port, 3000, 1, $protoType)
+            |Start-Sleep -Seconds 4
+            |if (${'$'}scales.IsOpen('$ip', $port) -ne 1) { throw "握手失败 (Open=${'$'}r)" }
+            |${'$'}fMap = [Cas.CasIOLib.Scales].GetField('m_mapClients', 'NonPublic,Instance')
+            |${'$'}map = ${'$'}fMap.GetValue(${'$'}scales)
+            |${'$'}conn = ${'$'}null
+            |foreach (${'$'}k in ${'$'}map.Keys) { ${'$'}conn = ${'$'}map[${'$'}k] }
+            |if (-not ${'$'}conn) { throw "未取到连接对象" }
+            |${'$'}now = Get-Date
+            |${'$'}bytes = [Byte[]]@([Byte](${'$'}now.Year - 2000), [Byte]${'$'}now.Month, [Byte]${'$'}now.Day, [Byte]${'$'}now.Hour, [Byte]${'$'}now.Minute, [Byte]${'$'}now.Second)
+            |${'$'}casLib = [Reflection.Assembly]::LoadFrom("${'$'}tools\CasLib.dll")
+            |${'$'}diType = ${'$'}casLib.GetType('Cas.Scale.Data+Structure+DateInfo')
+            |${'$'}di = [Activator]::CreateInstance(${'$'}diType)
+            |${'$'}fi = 'Public,NonPublic,Instance'
+            |${'$'}diType.GetField('arrSystemDate', ${'$'}fi).SetValue(${'$'}di, ${'$'}bytes)
+            |${'$'}diType.GetField('arrSaleDate', ${'$'}fi).SetValue(${'$'}di, ${'$'}bytes)
+            |${'$'}diType.GetField('nNo', ${'$'}fi).SetValue(${'$'}di, [UInt32]1)
+            |${'$'}diType.GetField('strName', ${'$'}fi).SetValue(${'$'}di, '$ip')
+            |${'$'}diType.GetField('m_nSubDataType', ${'$'}fi).SetValue(${'$'}di, [Int32]2031)
+            |${'$'}nResult = 0
+            $makeCall
+            |if (-not ${'$'}frame) { throw "帧生成失败 (nResult=${'$'}nResult)" }
+            |[void]${'$'}scales.Close('$ip', $port)
+            |${'$'}bw = New-Object IO.BinaryWriter([IO.File]::Create("$outPath"))
+            |${'$'}bw.Write([int]${'$'}frame.Length)
+            |${'$'}bw.Write(${'$'}frame)
+            |${'$'}bw.Close()
+            |Write-Output 'FRAMES_OK'
+        """.trimMargin()
+    }
+
     /** PLU 列表 → JSON（品名走 Unicode，官方库按系统 ANSI(GBK) 编码回帧）。 */
     private fun buildPluJson(list: List<PluItem>): String = list.joinToString(",", "[", "]") { plu ->
         """{"pluNo":${plu.pluNo},"dept":${casDept(plu.mainGroup)},"pluType":${pluTypeOf(plu)}, """ +
@@ -303,11 +434,63 @@ class CasClDriver(
     override suspend fun readLabelFormats(): Result<List<LabelTemplate>> =
         Result.failure(UnsupportedOperationException("凯士标签格式回收待接入（.lfm 格式已定位，见 CL-Works Label 目录）"))
 
-    override suspend fun syncTime(): Result<Unit> =
-        Result.failure(UnsupportedOperationException("凯士时间同步待接入（Cl5k.ScaleDate）"))
+    /**
+     * 时间同步（真机校准 2026-11-27 @192.168.0.111）。
+     *
+     * 链路 = 桥接脚本 Scales.Open 真握手 → 反射 m_mapClients 取真实 Cas.Ethernet.Client
+     * （Make4Download 要求 IConnect 可转 ScaleDevice，C# 桩会被拒 -1003）→
+     * DateInfo(nNo>=1, arrSystemDate=[年-2000,月,日,时,分,秒] 原始字节) → Cl5k.ScaleDate.
+     * Make4Download 生成 `W45F01,00L{len}:Y={X2}.M={X2}.D={X2}.h={X2}.m={X2}.s={X2}.` 帧 →
+     * Kotlin 裸 TCP ×8 发送 → 秤端 ACK `W45:O01`。读时间回读验证一致。
+     */
+    override suspend fun syncTime(): Result<Unit> = withContext(Dispatchers.IO) {
+        bridgeMutex.withLock {
+            runCatching {
+                val frames = generateDateFramesViaBridge(includeDownload = true)
+                val frame = frames.lastOrNull() ?: error("凯士同步帧生成失败")
+                java.net.Socket().use { sock ->
+                    sock.tcpNoDelay = true
+                    sock.connect(java.net.InetSocketAddress(device.ip, device.port), 5000)
+                    sock.soTimeout = RESPONSE_TIMEOUT_MS.toInt()
+                    val out = sock.getOutputStream()
+                    val inp = sock.getInputStream()
+                    repeat(8) {
+                        out.write(frame)
+                        out.flush()
+                        Thread.sleep(FRAME_GAP_MS)
+                    }
+                    val resp = readReplyText(inp, "W45")
+                    if (!resp.contains("W45:O")) {
+                        error("凯士时间同步未确认 (期望 W45:O): ${resp.take(80)}")
+                    }
+                }
+            }
+        }
+    }
 
-    override suspend fun readTime(): Result<java.time.LocalDateTime> =
-        Result.failure(UnsupportedOperationException("凯士读取秤内时间待接入（Cl5k.DateInfo）"))
+    /** 读取秤内时间：UL 帧 `R45F01,0001.` → 回包 `W45F01,001L042:` + `Y/M/D/h/m/s={X2}.`。 */
+    override suspend fun readTime(): Result<java.time.LocalDateTime> = withContext(Dispatchers.IO) {
+        bridgeMutex.withLock {
+            runCatching {
+                val frames = generateDateFramesViaBridge(includeDownload = false)
+                val frame = frames.firstOrNull() ?: error("凯士读时间帧生成失败")
+                java.net.Socket().use { sock ->
+                    sock.tcpNoDelay = true
+                    sock.connect(java.net.InetSocketAddress(device.ip, device.port), 5000)
+                    sock.soTimeout = RESPONSE_TIMEOUT_MS.toInt()
+                    val out = sock.getOutputStream()
+                    val inp = sock.getInputStream()
+                    repeat(8) {
+                        out.write(frame)
+                        out.flush()
+                        Thread.sleep(FRAME_GAP_MS)
+                    }
+                    val resp = readReplyText(inp, "Y=")
+                    parseClTime(resp) ?: error("凯士时间回包解析失败: ${resp.take(120)}")
+                }
+            }
+        }
+    }
 
     override suspend fun downloadLabelTemplate(template: LabelTemplate): Result<Unit> =
         Result.failure(UnsupportedOperationException("凯士标签下发待接入（DATA_LABEL=1003）"))
@@ -410,6 +593,9 @@ class CasClDriver(
         /** 帧生成进程超时：基础 + 每 PLU 追加（DLL 加载 + Add-Type 编译约 10s）。 */
         private const val FRAME_GEN_BASE_TIMEOUT_MS = 60_000L
         private const val FRAME_GEN_PER_PLU_TIMEOUT_MS = 3_000L
+
+        /** 时间帧生成进程超时（握手等待 ~4s + DLL 加载）。 */
+        private const val DATE_GEN_TIMEOUT_MS = 60_000L
 
         /** 桥接进程传递凯士工具目录的环境变量名（路径可能含中文）。 */
         private const val CAS_TOOLS_ENV = "SCALEPLEX_CAS_TOOLS"

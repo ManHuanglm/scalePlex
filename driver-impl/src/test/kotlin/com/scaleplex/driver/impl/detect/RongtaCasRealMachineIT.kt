@@ -126,15 +126,37 @@ class RongtaCasRealMachineIT {
         check(r.getOrThrow().success == 3) { "凯士多条下发数量不符: ${r.getOrThrow()}" }
     }
 
-    /** 时间同步当前两品牌均未接入，验证驱动返回明确的 UnsupportedOperationException 而非崩溃。 */
+    /** 时间同步：容大未接入（抛 UnsupportedOperationException），验证驱动返回明确错误而非崩溃。 */
     @Test
-    fun `sync time not wired behavior`() = runBlocking {
+    fun `rongta sync time not wired behavior`() = runBlocking {
         val rongta = RongtaUdpDriver(rongta()).syncTime()
-        val cas = CasClDriver(cas()).syncTime()
         println("rongta syncTime: $rongta")
-        println("cas syncTime: $cas")
-        check(rongta.isFailure && cas.isFailure) { "时间同步应返回失败结果（待接入）" }
+        check(rongta.isFailure) { "容大时间同步应返回失败结果（待接入）" }
         check(rongta.exceptionOrNull() is UnsupportedOperationException) { "容大应抛 UnsupportedOperationException" }
-        check(cas.exceptionOrNull() is UnsupportedOperationException) { "凯士应抛 UnsupportedOperationException" }
+    }
+
+    /** 凯士读取秤内时间（真机：UL 帧 R45F01,0001. → Y/M/D/h/m/s 回包）。 */
+    @Test
+    fun `cas read time`() = runBlocking {
+        val drv = CasClDriver(cas())
+        val t = drv.readTime()
+        println("cas readTime: $t")
+        check(t.isSuccess) { "凯士读时间失败: ${t.exceptionOrNull()?.message}" }
+    }
+
+    /** 凯士时间同步（真机：W45 帧 → ACK W45:O01 → 回读验证）。 */
+    @Test
+    fun `cas sync time`() = runBlocking {
+        val drv = CasClDriver(cas())
+        val synced = drv.syncTime()
+        println("cas syncTime: $synced")
+        check(synced.isSuccess) { "凯士时间同步失败: ${synced.exceptionOrNull()?.message}" }
+        val t = drv.readTime()
+        check(t.isSuccess) { "同步后读时间失败: ${t.exceptionOrNull()?.message}" }
+        val now = java.time.LocalDateTime.now()
+        val scaleTime = t.getOrThrow()
+        val driftSec = java.time.Duration.between(scaleTime, now).abs().seconds
+        println("cas scaleTime=$scaleTime pcTime=$now drift=${driftSec}s")
+        check(driftSec <= 120) { "同步后时钟偏差过大: scale=$scaleTime pc=$now" }
     }
 }
