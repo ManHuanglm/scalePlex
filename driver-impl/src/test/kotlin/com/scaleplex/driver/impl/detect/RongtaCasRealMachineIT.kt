@@ -126,13 +126,16 @@ class RongtaCasRealMachineIT {
         check(r.getOrThrow().success == 3) { "凯士多条下发数量不符: ${r.getOrThrow()}" }
     }
 
-    /** 时间同步：容大未接入（抛 UnsupportedOperationException），验证驱动返回明确错误而非崩溃。 */
+    /** 容大时间同步（真机 2026-11-27 标定：单发 0E 01 开场帧×8 → 0x02 ACK；绝不能发 0E 02，空会话会清空 PLU 表）。 */
     @Test
-    fun `rongta sync time not wired behavior`() = runBlocking {
-        val rongta = RongtaUdpDriver(rongta()).syncTime()
-        println("rongta syncTime: $rongta")
-        check(rongta.isFailure) { "容大时间同步应返回失败结果（待接入）" }
-        check(rongta.exceptionOrNull() is UnsupportedOperationException) { "容大应抛 UnsupportedOperationException" }
+    fun `rongta sync time`() = runBlocking {
+        val drv = RongtaUdpDriver(rongta())
+        if (drv.getStatus().getOrNull()?.online != true) {
+            org.junit.Assume.assumeTrue("容大秤 192.168.0.96 不可达，跳过", false)
+        }
+        val synced = drv.syncTime()
+        println("rongta syncTime: $synced")
+        check(synced.isSuccess) { "容大时间同步失败: ${synced.exceptionOrNull()?.message}" }
     }
 
     /** 凯士读取秤内时间（真机：UL 帧 R45F01,0001. → Y/M/D/h/m/s 回包）。 */

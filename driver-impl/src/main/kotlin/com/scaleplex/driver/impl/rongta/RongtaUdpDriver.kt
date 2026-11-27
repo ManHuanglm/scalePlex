@@ -29,8 +29,11 @@ import java.nio.charset.Charset
  * 在线探测：UDP 存活检查（连发两个探测报文，Windows 下收到 ICMP 不可达时下一次
  * send 抛 ConnectionReset => 离线；静默 => 在线）。
  *
- * 待标定：254 字节数据区内价格/条码/单位/部门字段偏移未定位（需 RTPLU 编辑已知价格
- * PLU 后抓包 diff），PLU 下发暂不可用——避免以错误字段布局覆盖秤端数据。
+ * 时间同步（真机标定 2026-11-27）：单发会话开场帧 0E 01（含 BCD 当前时间）×8 即完成
+ * 校时（秤屏/标签打印时间实测同步），秤端回 0x02 ACK；**绝不能补发会话结束帧 0E 02**
+ * ——空会话提交会把秤端 PLU 表清空（真机实验证实）。
+ *
+ * 待标定：PLU 回收/删除、流水回收/清空、标签格式下发/回收帧类型。
  */
 class RongtaUdpDriver(
     private val device: ScaleDevice,
@@ -96,8 +99,35 @@ class RongtaUdpDriver(
     override suspend fun readLabelFormats(): Result<List<LabelTemplate>> =
         Result.failure(UnsupportedOperationException("容大标签格式回收待标定（RTPLU 的 .scr 标签文件格式已定位）"))
 
-    override suspend fun syncTime(): Result<Unit> =
-        Result.failure(UnsupportedOperationException("容大时间同步帧待抓包标定"))
+    /**
+     * 时间同步（真机标定 2026-11-27）：单发会话开场帧 0E 01（内含 BCD 当前时间）×8，
+     * 秤端每帧回 1 字节 0x02 ACK，收到至少一个 ACK 判成功。
+     * 红线：绝不能附加会话结束帧 0E 02——空会话提交会把秤端 PLU 表清空（真机实验证实）。
+     */
+    override suspend fun syncTime(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val frame = sessionFrame()
+            var acked = 0
+            DatagramSocket().use { sock ->
+                sock.broadcast = true
+                sock.soTimeout = ACK_TIMEOUT_MS.toInt()
+                val addr = InetAddress.getByName(device.ip)
+                val buf = ByteArray(16)
+                repeat(8) {
+                    sock.send(DatagramPacket(frame, frame.size, addr, device.port))
+                    try {
+                        val pkt = DatagramPacket(buf, buf.size)
+                        sock.receive(pkt)
+                        if (pkt.length > 0 && buf[0] == ACK_BYTE) acked++
+                    } catch (_: java.net.SocketTimeoutException) {
+                        // 单帧 ACK 丢失不致命，8 连发兜底
+                    }
+                    Thread.sleep(FRAME_GAP_MS)
+                }
+            }
+            check(acked > 0) { "容大秤端未确认校时帧（未收到 0x02 ACK）" }
+        }
+    }
 
     override suspend fun readTime(): Result<java.time.LocalDateTime> =
         Result.failure(UnsupportedOperationException("容大不支持读取秤内时间"))
@@ -136,7 +166,7 @@ class RongtaUdpDriver(
 
     private fun blankFrame(type: Int): ByteArray = ByteArray(FRAME_SIZE).also { it[0] = type.toByte() }
 
-    /** 会话开场帧：0E 01 00 34 12 00 + BCD 时间戳(年月日时分秒)。 */
+    /** 会话开场帧：0E 01 00 34 12 00 + BCD 时间戳(年月日时分秒)。单发即校时（时间戳=PC 当前时间）。 */
     private fun sessionFrame(): ByteArray {
         val f = blankFrame(0x0E)
         f[1] = 0x01
@@ -247,5 +277,7 @@ class RongtaUdpDriver(
         private const val NAME_SIZE = 36
         private const val PLUS_PER_FRAME = 4
         private const val FRAME_GAP_MS = 5L
+        private const val ACK_TIMEOUT_MS = 300L
+        private const val ACK_BYTE: Byte = 0x02
     }
 }
