@@ -166,17 +166,21 @@ class RongtaUdpDriver(
 
     private fun blankFrame(type: Int): ByteArray = ByteArray(FRAME_SIZE).also { it[0] = type.toByte() }
 
-    /** 会话开场帧：0E 01 00 34 12 00 + BCD 时间戳(年月日时分秒)。单发即校时（时间戳=PC 当前时间）。 */
-    private fun sessionFrame(): ByteArray {
+    /**
+     * 会话开场帧：`0E 01 00 34 12 00` + 保留字节 0x00 + BCD 时间戳(年月日时分秒)。
+     * 字节布局以 RTPLU 抓包模板为准：偏移 6 固定 0x00，时间戳占偏移 7..12（偏移差 1
+     * 会导致秤端解析出乱日期，真机教训 2026-11-27）。单发即校时（时间戳=PC 当前时间）。
+     */
+    internal fun sessionFrame(now: java.time.LocalDateTime = java.time.LocalDateTime.now()): ByteArray {
         val f = blankFrame(0x0E)
         f[1] = 0x01
         f[2] = 0x00
         f[3] = 0x34
         f[4] = 0x12
         f[5] = 0x00
-        val now = java.time.LocalDateTime.now()
+        f[6] = 0x00
         val bcd = listOf(now.year % 100, now.monthValue, now.dayOfMonth, now.hour, now.minute, now.second)
-        bcd.forEachIndexed { i, v -> f[6 + i] = bcdByte(v) }
+        bcd.forEachIndexed { i, v -> f[7 + i] = bcdByte(v) }
         return f
     }
 
