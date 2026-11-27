@@ -14,7 +14,7 @@ import java.io.File
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
-import java.net.SocketException
+import java.net.SocketTimeoutException
 import java.nio.charset.Charset
 
 /**
@@ -27,8 +27,8 @@ import java.nio.charset.Charset
  * - PLU 记录 `01 <PLU 号:2 小端>` + GBK 品名（空格填充）；
  * - 会话结束 `0E 02 00 34 12 00`。
  *
- * 在线探测：UDP 存活检查（连发两个探测报文，Windows 下收到 ICMP 不可达时下一次
- * send 抛 ConnectionReset => 离线；静默 => 在线）。
+ * 在线探测：真实协议探测——发 PLU 槽位请求帧（0E 03）等秤端回包，两次无应答判离线
+ * （旧 UDP ICMP 存活检查在关机后 ARP 缓存未过期时静默成功，误判在线，已弃用）。
  *
  * 时间同步（真机标定 2026-11-27）：单发会话开场帧 0E 01（含 BCD 当前时间）×8 即完成
  * 校时（秤屏/标签打印时间实测同步），秤端回 0x02 ACK；**绝不能补发会话结束帧 0E 02**
@@ -215,25 +215,44 @@ class RongtaUdpDriver(
         Result.failure(UnsupportedOperationException("容大流水清空协议待抓包标定"))
 
     /**
-     * UDP 存活检查：首包触发可能的 ICMP 端口不可达，短暂等待后第二包若抛
-     * ConnectionReset 判离线（端口关闭/主机不可达），静默判在线。
+     * 在线探测（真实协议探测，2026-11-27 标定）：向 UDP 5001 发 PLU 槽位请求帧
+     * `0E 03 00 {slot:int16 LE}{0x80}`，秤开机必回 `0E 03` 开头的数据/空槽包；收到回包
+     * 判在线，无应答重发一次，两次均无应答判离线。旧 UDP ICMP 存活检查已弃用——秤关机后
+     * ARP 缓存未过期时发送静默成功（无 ICMP 反馈），会误判在线。
      */
-    private fun isUdpAlive(ip: String, port: Int, probeMs: Long = PROBE_WAIT_MS): Boolean =
+    private fun isUdpAlive(ip: String, port: Int): Boolean {
+        val frame = slotRequestFrame(PROBE_SLOT)
         DatagramSocket().use { s ->
+            s.soTimeout = PROBE_ACK_TIMEOUT_MS.toInt()
             val addr = InetAddress.getByName(ip)
-            s.send(DatagramPacket(byteArrayOf(0x00), 1, addr, port))
-            try {
-                Thread.sleep(probeMs)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
+            val buf = ByteArray(PROBE_BUF_SIZE)
+            repeat(PROBE_ATTEMPTS) {
+                s.send(DatagramPacket(frame, frame.size, addr, port))
+                try {
+                    val pkt = DatagramPacket(buf, buf.size)
+                    s.receive(pkt)
+                    if (pkt.length >= 2 && buf[0] == 0x0E.toByte() && buf[1] == 0x03.toByte()) return true
+                } catch (_: java.net.SocketTimeoutException) {
+                    // 无应答，重试
+                }
             }
-            try {
-                s.send(DatagramPacket(byteArrayOf(0x00), 1, addr, port))
-            } catch (_: SocketException) {
-                return@use false
-            }
-            true
         }
+        return false
+    }
+
+    /**
+     * PLU 槽位请求帧（回收会话单槽读）：[0E][03][00][slot int16 LE][0x80]，00 填充至 257B；
+     * 秤回 `0E 03 00` + 64B 记录（空槽为 FF 填充）。
+     */
+    internal fun slotRequestFrame(slot: Int): ByteArray {
+        val f = blankFrame(0x0E)
+        f[1] = 0x03
+        f[2] = 0x00
+        f[3] = (slot and 0xFF).toByte()
+        f[4] = ((slot shr 8) and 0xFF).toByte()
+        f[5] = 0x80.toByte()
+        return f
+    }
 
     // ---- 帧构造（布局经真机抓包标定，见类注释） ----
 
@@ -350,7 +369,10 @@ class RongtaUdpDriver(
     companion object {
         private val log = org.slf4j.LoggerFactory.getLogger(RongtaUdpDriver::class.java)
 
-        private const val PROBE_WAIT_MS = 300L
+        private const val PROBE_SLOT = 1
+        private const val PROBE_ATTEMPTS = 2
+        private const val PROBE_ACK_TIMEOUT_MS = 1500L
+        private const val PROBE_BUF_SIZE = 512
         private const val FRAME_SIZE = 257
         private const val SLOT_SIZE = 64
         private const val NAME_SIZE = 36
