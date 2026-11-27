@@ -493,8 +493,11 @@ class CasClDriver(
 
     /**
      * 顺序解析 `W02A` PLU 回帧为 [PluItem]（官方 Interprete4Upload 对裸回包抛越界，自实现）。
-     * 字段格式 `F={code:X2}.{type},{len}:` + len 字节原始数据；type：57=UInt16 LE、4C=UInt32 LE、
-     * 4D/42=Byte、53=GBK 字符串。尾字节为 BCC，不入字段区。
+     * 字段格式 `F={code:X2}.{type},{len:X}:` + len 字节原始数据——**len 为十六进制**
+     * （真机 PLU4 `F=0A.53,11:` = 17B "鲜带肉尾叉骨 计重" 验证；按十进制读会在 len≥0x0A
+     * 时截断名称并错位后续字段，表现为价格 0 + 名称乱码/空白）。type：57=UInt16 LE、
+     * 4C=UInt32 LE、4D/42=Byte、53=GBK 字符串（CL-Works 下发的称重品名称含 " 计重" 后缀，
+     * 如实保留）。尾字节为 BCC，不入字段区。
      */
     internal fun parseCasPluFrame(frame: ByteArray): PluItem? {
         val text = String(frame, Charsets.ISO_8859_1)
@@ -514,7 +517,7 @@ class CasClDriver(
             if (text[pos + 7] != ',') break
             var q = pos + 8
             var lenStr = ""
-            while (q < text.length && text[q] in '0'..'9') {
+            while (q < text.length && text[q].isHexLenChar()) {
                 lenStr += text[q]
                 q++
             }
@@ -522,7 +525,7 @@ class CasClDriver(
                 pos += 2
                 continue
             }
-            val len = lenStr.toInt()
+            val len = lenStr.toInt(16)
             val dataStart = q + 1
             val dataEnd = dataStart + len
             if (dataEnd > frame.size) break
@@ -554,6 +557,10 @@ class CasClDriver(
         if (idx + 2 > text.length) return null
         return text.substring(idx, idx + 2).toIntOrNull(16)
     }
+
+    /** 字段长度字符（帧内 len 为十六进制：0-9/A-F/a-f）。 */
+    private fun Char.isHexLenChar(): Boolean =
+        this in '0'..'9' || this in 'a'..'f' || this in 'A'..'F'
 
     private fun le16(b: ByteArray, off: Int): Int =
         (b[off].toInt() and 0xFF) or ((b[off + 1].toInt() and 0xFF) shl 8)
