@@ -15,6 +15,12 @@ local.properties
 *.exe
 # 自研工具链桥接（功能必需，随应用分发）
 !app/src/main/resources/tools/rongta/RongtaPluBridge.exe
+# 大华 DLL 运行时产物（不入库）
+app/src/main/resources/tools/dahua/dhip.ini
+app/src/main/resources/tools/dahua/dhplupathname.ini
+app/src/main/resources/tools/dahua/dhpluversion.ini
+app/src/main/resources/tools/dahua/receive.log
+app/src/main/resources/tools/dahua/return.txt
 
 # 便携版构建产物
 /ScalePlex-*-portable.zip

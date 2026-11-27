@@ -139,20 +139,27 @@ object DahuaBridge {
         return code
     }
 
-    private fun buildBridgeScript(toolsDir: String, functionName: String): String = """
-        |${'$'}ErrorActionPreference = 'Stop'
-        |Set-Location -LiteralPath '$toolsDir'
-        |Add-Type -TypeDefinition @"
-        |using System;
-        |using System.Runtime.InteropServices;
-        |public static class DahuaScaleApi {
-        |    [DllImport(@"$toolsDir\$DLL_NAME", CallingConvention = CallingConvention.StdCall)]
-        |    public static extern int $functionName();
-        |}
-        |"@
-        |Write-Output [DahuaScaleApi]::$functionName()
-        |exit 0
-    """.trimMargin()
+    private fun buildBridgeScript(toolsDir: String, functionName: String): String {
+        // C# verbatim 字符串 @"..." 会与 PowerShell here-string @"..."@ 冲突导致解析错误，
+        // 故用普通字符串并转义反斜杠
+        val csPath = toolsDir.replace("\\", "\\\\")
+        return """
+            |${'$'}ErrorActionPreference = 'Stop'
+            |Set-Location -LiteralPath '$toolsDir'
+            |# Set-Location 不改 Win32 进程 CWD，依赖 DLL（dhplunet.dll）解析需 .NET 层 CWD
+            |[System.Environment]::CurrentDirectory = '$toolsDir'
+            |Add-Type -TypeDefinition @"
+            |using System;
+            |using System.Runtime.InteropServices;
+            |public static class DahuaScaleApi {
+            |    [DllImport("$csPath\\$DLL_NAME", CallingConvention = CallingConvention.StdCall)]
+            |    public static extern int $functionName();
+            |}
+            |"@
+            |Write-Output ([DahuaScaleApi]::$functionName())
+            |exit 0
+        """.trimMargin()
+    }
 
     /** 读取 Return.txt：每行 `IP<Tab>码`，返回目标 IP 的内层码（无文件/无行=null）。 */
     fun readReturnTxt(file: File, ip: String): Int? {

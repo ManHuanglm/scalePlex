@@ -15,8 +15,11 @@ object ToolsDeployer {
     private val TOOL_FILES: Map<String, List<String>> = mapOf(
         // 寺冈 8442 族（TWS.exe + SMScale.dll + SM.ini/Scale.ini）与 b 族（SMScaleAPI.dll）
         "digi" to listOf("TWS.exe", "SMScale.dll", "SM.ini", "Scale.ini", "SMScaleAPI.dll"),
-        // 大华 DhScalePluNet.dll（依赖 dhplunet.dll）
-        "dahua" to listOf("DhScalePluNet.dll", "dhplunet.dll"),
+        // 大华 DhScalePluNet.dll（依赖 dhplunet.dll + datatransters.dll；obj.txt = 各版本 PLU 对象模板）
+        "dahua" to listOf(
+            "DhScalePluNet.dll", "dhplunet.dll", "datatransters.dll",
+            "dhbz5obj.txt", "dhbz6obj.txt", "dhtma07obj.txt",
+        ),
         // 顶尖 AclasSDK.dll + AclasSDK.ini
         "aclas" to listOf("AclasSDK.dll", "AclasSDK.ini"),
         // 托利多 MTScaleAPI.dll（无服务模式全套依赖 + MTScaleKey.config，缺依赖无法加载）
