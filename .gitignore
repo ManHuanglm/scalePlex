@@ -13,6 +13,8 @@ local.properties
 # 安装包与临时文件
 *.msi
 *.exe
+# 自研工具链桥接（功能必需，随应用分发）
+!app/src/main/resources/tools/rongta/RongtaPluBridge.exe
 
 # 便携版构建产物
 /ScalePlex-*-portable.zip
