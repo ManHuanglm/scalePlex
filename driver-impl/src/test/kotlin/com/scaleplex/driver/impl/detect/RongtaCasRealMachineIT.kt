@@ -162,4 +162,18 @@ class RongtaCasRealMachineIT {
         println("cas scaleTime=$scaleTime pcTime=$now drift=${driftSec}s")
         check(driftSec <= 120) { "同步后时钟偏差过大: scale=$scaleTime pc=$now" }
     }
+
+    /** 凯士 PLU 回收（真机：R02F 请求帧 → W02A 数据帧，连续空槽自动终止）。 */
+    @Test
+    fun `cas plu upload`() = runBlocking {
+        val drv = CasClDriver(cas())
+        val r = drv.uploadPlu()
+        println("cas upload failure=${r.exceptionOrNull()?.message}")
+        val list = r.getOrThrow()
+        println("cas upload count=${list.size}")
+        check(list.isNotEmpty()) { "凯士回收结果为空" }
+        val plu1 = list.firstOrNull { it.pluNo == 1 }
+        checkNotNull(plu1) { "回收结果缺 PLU1: ${list.take(10).map { it.pluNo }}" }
+        println("cas PLU1: $plu1")
+    }
 }

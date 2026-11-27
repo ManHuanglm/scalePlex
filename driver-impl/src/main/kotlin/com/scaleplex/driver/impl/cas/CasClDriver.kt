@@ -33,7 +33,8 @@ import java.nio.charset.Charset
  * 生成协议帧 + Kotlin 裸 TCP 20304 逐帧发送（真机验证 W02:O，2026-11-27）。
  * 手工逆向 ASCII 帧秤端一律拒绝（W02:EFE），字段集由官方 PluSchema 控制（见 buildFrameScript）；
  * 时间同步/读时间 = Cl5k.ScaleDate 帧桥接（真机验证 2026-11-27，ACK W45:O01）；
- * 回收/删除待接入。
+ * PLU 回收 = 请求帧 `R02F{dept:X2}{pluNo:X6},00\n`（官方 Make4Upload 生成格式，Kotlin 直接拼）
+ * + `W02A` 数据帧顺序解析（真机验证 2026-11-27，见 uploadPlu）；删除待接入（Make4DeleteOne）。
  *
  * 前置条件：系统属性 `scaleplex.cas.tools` 指向含 CasComm.dll/CasLib.dll/Cl5k.dll/CommManager.dll/
  * DBManager.dll 及 config\plustruct.str 的 CL-Works 目录。
@@ -422,14 +423,152 @@ class CasClDriver(
     /** 部门取 1..9999，超界回退 1。 */
     private fun casDept(mainGroup: Int): Int = if (mainGroup in 1..9999) mainGroup else 1
 
+    /**
+     * PLU 批量回收（真机破解 2026-11-27 @192.168.0.111）。
+     *
+     * 链路 = 请求帧 `R02F{dept:X2}{pluNo:X6},00\n`（官方 Cl5k.Plu.Make4Upload 生成的格式，
+     * dept/pluNo 必须 ≥1；真机验证秤端实际只按 PLU 号查询，dept 恒填 01）→ 单发单收
+     * （复用一条 TCP 连接）→ 回帧 `W02A{plu:X5},{dept:X2}L{len}:{头字段}F={code}.{type},{len}:`
+     * + 原始字段字节 + 1B BCC。空槽/越界回 `W02AF4240,00L002B:...N=0000`。
+     * 遍历 1..MAX_UPLOAD_PLU，连续 EMPTY_RUN_STOP 个空槽即提前终止。
+     */
+    override suspend fun uploadPlu(): Result<List<PluItem>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val result = mutableListOf<PluItem>()
+            var emptyRun = 0
+            java.net.Socket().use { sock ->
+                sock.tcpNoDelay = true
+                sock.connect(java.net.InetSocketAddress(device.ip, device.port), 5000)
+                sock.soTimeout = RESPONSE_TIMEOUT_MS.toInt()
+                val out = sock.getOutputStream()
+                val inp = sock.getInputStream()
+                for (pluNo in 1..MAX_UPLOAD_PLU) {
+                    val req = ("R02F01" + String.format("%06X", pluNo) + ",00\n")
+                        .toByteArray(Charsets.ISO_8859_1)
+                    out.write(req)
+                    out.flush()
+                    val frame = readUploadFrame(inp) ?: break
+                    val text = String(frame, Charsets.ISO_8859_1)
+                    if (!text.startsWith("W02A")) break
+                    if (text.startsWith("W02AF4240")) {
+                        emptyRun++
+                        if (emptyRun >= EMPTY_RUN_STOP) break
+                    } else {
+                        emptyRun = 0
+                        parseCasPluFrame(frame)?.let { result += it }
+                    }
+                }
+            }
+            result
+        }
+    }
+
+    /** 读取一条 `W02A` 回帧：由 `L{hex}:` 载荷长度精确读满（超时/断开返回 null）。 */
+    private fun readUploadFrame(inp: java.io.InputStream): ByteArray? {
+        val deadline = System.currentTimeMillis() + RESPONSE_TIMEOUT_MS
+        val buf = ByteArray(4096)
+        var acc = ByteArray(0)
+        while (System.currentTimeMillis() < deadline) {
+            val text = String(acc, Charsets.ISO_8859_1)
+            val lIdx = text.indexOf('L')
+            if (lIdx > 0) {
+                val colon = text.indexOf(':', lIdx)
+                if (colon > lIdx) {
+                    val payloadLen = text.substring(lIdx + 1, colon).toIntOrNull(16)
+                    if (payloadLen != null && payloadLen > 0 && acc.size >= colon + 1 + payloadLen) {
+                        return acc.copyOf(colon + 1 + payloadLen)
+                    }
+                }
+            }
+            val n = try {
+                inp.read(buf)
+            } catch (_: java.net.SocketTimeoutException) {
+                return null
+            }
+            if (n <= 0) return null
+            acc += buf.copyOf(n)
+        }
+        return null
+    }
+
+    /**
+     * 顺序解析 `W02A` PLU 回帧为 [PluItem]（官方 Interprete4Upload 对裸回包抛越界，自实现）。
+     * 字段格式 `F={code:X2}.{type},{len}:` + len 字节原始数据；type：57=UInt16 LE、4C=UInt32 LE、
+     * 4D/42=Byte、53=GBK 字符串。尾字节为 BCC，不入字段区。
+     */
+    internal fun parseCasPluFrame(frame: ByteArray): PluItem? {
+        val text = String(frame, Charsets.ISO_8859_1)
+        if (!text.startsWith("W02A") || text.startsWith("W02AF4240")) return null
+        var dept = 1
+        var pluNo = 0
+        var pluType = 1
+        var unitPrice = 0L
+        var sellByDate = 0
+        var name = ""
+        var itemCode = 0L
+        var pos = text.indexOf("F=")
+        while (pos >= 0 && pos + FIELD_HEADER_MIN <= frame.size) {
+            val code = hex2(text, pos + 2) ?: break
+            if (text[pos + 4] != '.' ) { pos += 2; continue }
+            val type = hex2(text, pos + 5) ?: break
+            if (text[pos + 7] != ',') break
+            var q = pos + 8
+            var lenStr = ""
+            while (q < text.length && text[q] in '0'..'9') {
+                lenStr += text[q]
+                q++
+            }
+            if (lenStr.isEmpty() || q >= text.length || text[q] != ':') {
+                pos += 2
+                continue
+            }
+            val len = lenStr.toInt()
+            val dataStart = q + 1
+            val dataEnd = dataStart + len
+            if (dataEnd > frame.size) break
+            when (code) {
+                FIELD_DEPT -> dept = le16(frame, dataStart)
+                FIELD_PLU_NO -> pluNo = le32(frame, dataStart).toInt()
+                FIELD_PLU_TYPE -> pluType = frame[dataStart].toInt() and 0xFF
+                FIELD_UNIT_PRICE -> unitPrice = le32(frame, dataStart)
+                FIELD_NAME -> name = String(frame, dataStart, len, GBK)
+                FIELD_ITEM_CODE -> itemCode = le32(frame, dataStart)
+                FIELD_SELL_BY_DATE -> sellByDate = le32(frame, dataStart).toInt()
+            }
+            pos = dataEnd
+        }
+        if (pluNo <= 0) return null
+        return PluItem(
+            pluNo = pluNo,
+            name = name,
+            weightFlag = if (pluType == PLU_TYPE_COUNT) 1 else 0,
+            mainGroup = dept,
+            unitPrice = unitPrice,
+            usedByDate = sellByDate,
+            eanCode = if (itemCode > 0) itemCode.toString() else "",
+        )
+    }
+
+    /** 取 text[idx, idx+2) 的十六进制值（非法返回 null）。 */
+    private fun hex2(text: String, idx: Int): Int? {
+        if (idx + 2 > text.length) return null
+        return text.substring(idx, idx + 2).toIntOrNull(16)
+    }
+
+    private fun le16(b: ByteArray, off: Int): Int =
+        (b[off].toInt() and 0xFF) or ((b[off + 1].toInt() and 0xFF) shl 8)
+
+    private fun le32(b: ByteArray, off: Int): Long {
+        var v = 0L
+        for (i in 0 until 4) v = v or ((b[off + i].toLong() and 0xFF) shl (8 * i))
+        return v
+    }
+
     override suspend fun deletePlu(pluNo: Int): Result<Unit> =
         Result.failure(UnsupportedOperationException("凯士删除 PLU 待接入（Cl5k.Plu.Make4DeleteOne）"))
 
     override suspend fun deleteAllPlu(): Result<Unit> =
         Result.failure(UnsupportedOperationException("凯士清空 PLU 待接入（Cl5k.Plu.Make4DeleteAll）"))
-
-    override suspend fun uploadPlu(): Result<List<PluItem>> =
-        Result.failure(UnsupportedOperationException("凯士 PLU 回收待接入（Cl5k.Plu.Make4Upload）"))
 
     override suspend fun readLabelFormats(): Result<List<LabelTemplate>> =
         Result.failure(UnsupportedOperationException("凯士标签格式回收待接入（.lfm 格式已定位，见 CL-Works Label 目录）"))
@@ -596,6 +735,30 @@ class CasClDriver(
 
         /** 时间帧生成进程超时（握手等待 ~4s + DLL 加载）。 */
         private const val DATE_GEN_TIMEOUT_MS = 60_000L
+
+        /** PLU 回收遍历上限（CL 族典型容量级）。 */
+        private const val MAX_UPLOAD_PLU = 3000
+
+        /** 连续空槽达到该数量即终止回收遍历。 */
+        private const val EMPTY_RUN_STOP = 20
+
+        /** `W02A` 回帧字段头最短长度（`F=01.57,02:`）。 */
+        private const val FIELD_HEADER_MIN = 10
+
+        /** `W02A` 回帧字段代码（与下发 PluSchema 对应）。 */
+        private const val FIELD_DEPT = 0x01
+        private const val FIELD_PLU_NO = 0x02
+        private const val FIELD_PLU_TYPE = 0x04
+        private const val FIELD_UNIT_PRICE = 0x06
+        private const val FIELD_NAME = 0x0A
+        private const val FIELD_ITEM_CODE = 0x0B
+        private const val FIELD_SELL_BY_DATE = 0x10
+
+        /** CL 协议 PLU 类型：1=称重、2=计数。 */
+        private const val PLU_TYPE_COUNT = 2
+
+        /** 品名 GBK 字符集。 */
+        private val GBK: Charset = Charset.forName("GBK")
 
         /** 桥接进程传递凯士工具目录的环境变量名（路径可能含中文）。 */
         private const val CAS_TOOLS_ENV = "SCALEPLEX_CAS_TOOLS"
