@@ -1,9 +1,9 @@
 package com.scaleplex.driver.impl.dahua
 
-import com.scaleplex.communication.TcpClient
 import com.scaleplex.communication.CommEventBus
-import com.scaleplex.core.model.BatchResult
+import com.scaleplex.communication.TcpClient
 import com.scaleplex.core.model.BatchError
+import com.scaleplex.core.model.BatchResult
 import com.scaleplex.core.model.LabelTemplate
 import com.scaleplex.core.model.PluItem
 import com.scaleplex.core.model.ScaleBrand
@@ -13,15 +13,28 @@ import com.scaleplex.driver.api.AbstractScaleDriver
 import com.scaleplex.driver.api.ScaleStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 /**
- * Dahua 大华 TCP driver (port 4001). Second priority domestic brand.
+ * 大华 TMA_07 条码秤 TCP 驱动（真机抓包标定 2026-11-28 @192.168.0.150:4001）。
  *
- * Protocol: TCP text-based, each PLU sent as a line terminated by newline.
- * Based on DhScalePluNet.dll protocol (dhip.ini for IP, dhpluversion.ini for format).
+ * 协议为 ASCII 文本帧（CRLF 结尾，秤端应答以 ETX 0x03 结尾），帧编解码见 [DahuaProto]：
+ * - PLU 下发 `!0V{号}A{73位数字段}{条码段}`，应答 `0v{号}a{n}`（**ACK 不区分成败，
+ *   必须回读验证**——单价/代码为 0 的记录秤端拒写但 ACK 照回）；
+ * - PLU 回收 `!0U{号}A`，应答 `0u{号}A{数据}` / `0u{号}Anoplu`（空槽）；
+ * - 流水回收 `!0J{记录}A`，结束标志 `0j{号}ac`；`!0HA` = 清空已回收流水；
+ * - 校时 `!0P{yyMMddHHmm}`，ACK `0p`；标签格式表 `!0L{页}A{23×4位格式号}`。
+ *
+ * 大华秤**无远程删除命令**（!0D/W/G/X 盲试、空 !0V 帧、全零覆盖均真机验证无效，
+ * 官方软件与 DhScalePluNet.dll 亦无删除功能），deletePlu/deleteAllPlu 明确报不支持。
+ *
+ * 不走 transport.request：其读循环等对端 EOF 才返回，而秤保持连接会读到超时误判，
+ * 全部改用驱动内裸 Socket（读至 ETX）。
  */
 class DahuaTcpDriver(
     private val device: ScaleDevice,
@@ -35,7 +48,7 @@ class DahuaTcpDriver(
 
     override val brand: ScaleBrand = ScaleBrand.DAHUA
 
-    // Dahua PLU version from device config (default TMA_07 = 3)
+    /** 大华 PLU 版本（TMA_07 = 3），历史配置存于 device.note。 */
     private val pluVersion: Int = device.note.toIntOrNull() ?: 3
 
     /** 实际通讯口（历史数据里 1111 归一化为大华默认 4001）。 */
@@ -44,7 +57,6 @@ class DahuaTcpDriver(
     override suspend fun connect(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             transport.connect()
-            // Dahua typically doesn't need special handshake after TCP connect
             Unit
         }
     }
@@ -52,9 +64,9 @@ class DahuaTcpDriver(
     override suspend fun getStatus(): Result<ScaleStatus> = withContext(Dispatchers.IO) {
         runCatching {
             // TCP 4001 端口探测：4001 为大华条码秤专用通讯口；无安全的查询帧可用
-            //（读协议待标定，校时帧 !0P 会改秤时间不可用于探测），连接成功即在线。
-            java.net.Socket().use { s ->
-                s.connect(java.net.InetSocketAddress(device.ip, targetPort), CONNECT_TIMEOUT_MS)
+            //（校时帧 !0P 会改秤时间不可用于探测），连接成功即在线。
+            Socket().use { s ->
+                s.connect(InetSocketAddress(device.ip, targetPort), CONNECT_TIMEOUT_MS)
             }
             ScaleStatus(online = true, model = device.model)
         }
@@ -62,125 +74,240 @@ class DahuaTcpDriver(
 
     override suspend fun downloadPlu(plu: PluItem): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            val line = DahuaPluEncoder.encode(plu, DahuaPluEncoder.PluVersion.fromCode(pluVersion))
-            transport.send((line + "\r\n").toByteArray(Charsets.US_ASCII))
-            // Wait for ACK (Dahua typically echoes or returns OK)
-            Thread.sleep(50)
-            Unit
-        }
-    }
-
-    override suspend fun downloadPluBatch(list: List<PluItem>): Result<BatchResult> = withContext(Dispatchers.IO) {
-        runCatching {
-            var success = 0
-            val errors = mutableListOf<BatchError>()
-            for (plu in list) {
-                try {
-                    val line = DahuaPluEncoder.encode(plu, DahuaPluEncoder.PluVersion.fromCode(pluVersion))
-                    transport.send((line + "\r\n").toByteArray(Charsets.US_ASCII))
-                    Thread.sleep(30) // Small delay between PLUs
-                    success++
-                } catch (t: Throwable) {
-                    errors += BatchError(device.id, plu.pluNo, t.message ?: "error")
-                }
-            }
-            BatchResult(total = list.size, success = success, failed = list.size - success, errors = errors)
-        }
-    }
-
-    override suspend fun deletePlu(pluNo: Int): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            // Dahua delete: send special delete command
-            val line = "!0V${String.format("%04d", pluNo)}DELETE\r\n"
-            transport.send(line.toByteArray(Charsets.US_ASCII))
-            Unit
-        }
-    }
-
-    override suspend fun deleteAllPlu(): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            // Clear all PLUs command
-            transport.send("!0VALLDELETE\r\n".toByteArray(Charsets.US_ASCII))
-            Unit
+            session().use { ses -> writePluVerified(ses, plu) }
         }
     }
 
     /**
-     * 大华校时（真机破解 2026-11-28 @192.168.0.150:4001，官方 TMA4.0 上位机"时钟设置"
-     * 经本地 TCP 代理抓包标定）：
-     * - PC→秤 `!0P{yyMMddHHmm}\r\n`（ASCII 15B，时间 10 位**不带秒**）；
-     * - 成功 ACK = `0p\r\n` + ETX(0x03)，共 5B（命令小写镜像）。
-     * 官方 DhScalePluNet.dll 无时间接口（PE 导出表核验）；旧 `!0VTIME` 帧真机无应答已废弃。
-     * 秤内时钟无读取命令（仅可写入），readTime 不支持。
+     * PLU 批量下发：`!0V` 帧 + ACK + 回读验证（ACK 不区分成败，见类注释）。
      */
-    override suspend fun syncTime(): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun downloadPluBatch(list: List<PluItem>): Result<BatchResult> = withContext(Dispatchers.IO) {
         runCatching {
-            // 不走 transport.request：其读循环要等对端 EOF 才返回，而大华秤回 ACK 后
-            // 保持连接，读超时会误判；改用驱动内裸 Socket 精确读 ACK。
-            val resp = exchange(timeFrame(Date()))
-                ?: error("大华校时无应答")
-            check(resp.size >= 2 && resp[0] == '0'.code.toByte() && resp[1] == 'p'.code.toByte()) {
-                "大华校时应答异常: " + resp.joinToString(" ") { String.format("%02X", it) }
+            session().use { ses ->
+                var success = 0
+                val errors = mutableListOf<BatchError>()
+                for (plu in list) {
+                    try {
+                        writePluVerified(ses, plu)
+                        success++
+                    } catch (t: Throwable) {
+                        errors += BatchError(device.id, plu.pluNo, t.message ?: "error")
+                    }
+                }
+                BatchResult(total = list.size, success = success, failed = list.size - success, errors = errors)
             }
         }
     }
+
+    override suspend fun deletePlu(pluNo: Int): Result<Unit> =
+        Result.failure(UnsupportedOperationException("大华秤无远程删除命令（真机验证：官方软件/DLL 均无此功能，仅可覆盖）"))
+
+    override suspend fun deleteAllPlu(): Result<Unit> =
+        Result.failure(UnsupportedOperationException("大华秤无远程清空命令（真机验证：官方软件/DLL 均无此功能）"))
 
     /** 校时帧 `!0P{yyMMddHHmm}\r\n`（秒被协议丢弃，只到分）。 */
     internal fun timeFrame(date: Date): ByteArray =
         ("!0P" + SimpleDateFormat("yyMMddHHmm", Locale.ROOT).format(date) + "\r\n")
             .toByteArray(Charsets.US_ASCII)
 
-    /** 裸 Socket 单发单收（读满 ACK_SIZE 或超时）。 */
-    private fun exchange(frame: ByteArray): ByteArray? = java.net.Socket().use { s ->
-        s.tcpNoDelay = true
-        s.connect(java.net.InetSocketAddress(device.ip, targetPort), CONNECT_TIMEOUT_MS)
-        s.soTimeout = READ_TIMEOUT_MS
-        s.getOutputStream().apply {
-            write(frame)
-            flush()
-        }
-        val buf = ByteArray(ACK_SIZE)
-        var total = 0
-        try {
-            val inp = s.getInputStream()
-            while (total < buf.size) {
-                val n = inp.read(buf, total, buf.size - total)
-                if (n <= 0) break
-                total += n
+    /**
+     * 大华校时：PC→秤 `!0P{yyMMddHHmm}\r\n`，成功 ACK = `0p\r\n` + ETX。
+     * 秤内时钟无读取命令（仅可写入），readTime 不支持。
+     */
+    override suspend fun syncTime(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            session().use { ses ->
+                val resp = ses.request(timeFrame(Date()))
+                    ?: error("大华校时无应答")
+                check(resp.startsWith("0p")) { "大华校时应答异常: $resp" }
             }
-        } catch (_: java.net.SocketTimeoutException) {
-            // 超时返回已收到的部分
         }
-        if (total > 0) buf.copyOf(total) else null
     }
+
+    /**
+     * PLU 批量回收：`!0U{号}A` 逐槽扫描 0001~0999（与官方软件行为一致），
+     * `noplu` 为空槽跳过；秤端品名仅存字库代码（7 位商品代码），文本名称不可还原。
+     */
+    override suspend fun uploadPlu(): Result<List<PluItem>> = withContext(Dispatchers.IO) {
+        runCatching {
+            session().use { ses ->
+                val items = mutableListOf<PluItem>()
+                for (no in 1..DahuaProto.UPLOAD_SCAN_MAX) {
+                    val resp = ses.request(DahuaProto.pluQueryFrame(no))
+                        ?: error("大华回收无应答 (PLU $no)")
+                    val parsed = DahuaProto.parsePluResponse(resp, no)
+                        ?: continue
+                    val decoded = DahuaProto.decodeDigits(parsed.digits)
+                    items += PluItem(
+                        pluNo = no,
+                        name = "",
+                        weightFlag = decoded.weightFlag,
+                        unitPrice = decoded.unitPrice,
+                        usedByDate = decoded.usedByDate,
+                        eanCode = DahuaProto.parseBarcode(parsed.barcodeSegment),
+                    )
+                }
+                items
+            }
+        }
+    }
+
+    /**
+     * 标签格式表下发：官方 TMA4.0 行为 = 全表 4 页 × 23 格（格式号 0001..0092）照发，
+     * ScalePlex 的 LabelTemplate.id 校验范围后随全表一并下发。
+     */
+    override suspend fun downloadLabelTemplate(template: LabelTemplate): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            check(template.id in 1..DahuaProto.LABEL_TABLE_SIZE) {
+                "大华标签格式号须在 1~${DahuaProto.LABEL_TABLE_SIZE}（当前 ${template.id}）"
+            }
+            session().use { ses ->
+                for (frame in DahuaProto.labelTableFrames()) {
+                    val resp = ses.request(frame)
+                        ?: error("大华标签格式下发无应答")
+                    check(resp.startsWith("0l")) { "大华标签格式下发表决异常: $resp" }
+                }
+            }
+        }
+    }
+
+    /**
+     * 流水回收：`!0J{记录}A` 逐条读取至 `0j{no}ac` 结束；**不发 `!0H`**（流水保留在秤上）。
+     * 记录数据 56 位定长（时间 10 + 部门 2 + 店号 2 + PLU 4 + 重量/金额字段），
+     * 重量/金额字段切分待标签实样对照校准（见 [parseTradeData]）。
+     */
+    override suspend fun readTradeLog(): Result<List<TradeRecord>> = withContext(Dispatchers.IO) {
+        runCatching {
+            session().use { ses ->
+                val records = mutableListOf<TradeRecord>()
+                for (no in 1..TRADE_SCAN_MAX) {
+                    val resp = ses.request(DahuaProto.tradeQueryFrame(no))
+                        ?: break // 无应答
+                    val data = DahuaProto.parseTradeResponse(resp, no)
+                        ?: break // `0j{no}ac` 结束标志
+                    records += parseTradeData(no, data)
+                }
+                records
+            }
+        }
+    }
+
+    /** 流水清空：`!0HA`（回收结束确认帧，秤端清空全部流水）。 */
+    override suspend fun clearTradeLog(): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            session().use { ses ->
+                val resp = ses.request(DahuaProto.tradeClearFrame())
+                    ?: error("大华清流水无应答")
+                check(resp.startsWith("0h")) { "大华清流水应答异常: $resp" }
+            }
+        }
+    }
+
+    /**
+     * 单条下发 + 回读验证：`!0V` 写入后回读 `!0U`，对比商品代码与单价一致才算成功
+     * （ACK 无法区分成败，秤端对无效记录拒写但 ACK 照回）。
+     */
+    private fun writePluVerified(ses: Session, plu: PluItem) {
+        val digits = DahuaProto.encodeDigits(plu, shopNo = DEFAULT_SHOP_NO)
+        val segment = DahuaProto.barcodeSegment(plu.eanCode)
+        val ack = ses.request(DahuaProto.pluWriteFrame(plu.pluNo, digits, segment))
+            ?: error("大华下发无应答 (PLU ${plu.pluNo})")
+        check(ack.startsWith("0v" + "%04d".format(plu.pluNo) + "a")) {
+            "大华下发烧录应答异常 (PLU ${plu.pluNo}): $ack"
+        }
+        // 写入异步生效：ACK 后立即回读会读到旧值（真机实测），延迟后重试最多 3 次
+        var actual: String? = null
+        var matched = false
+        repeat(3) {
+            Thread.sleep(WRITE_SETTLE_MS)
+            val readback = ses.request(DahuaProto.pluQueryFrame(plu.pluNo))
+                ?: error("大华回读无应答 (PLU ${plu.pluNo})")
+            val p = DahuaProto.parsePluResponse(readback, plu.pluNo)
+            if (p != null && p.digits.take(13) == digits.take(13)) {
+                matched = true
+            } else {
+                actual = p?.digits?.take(13) ?: "空槽"
+            }
+        }
+        check(matched) {
+            "大华下发回读不一致 (PLU ${plu.pluNo}): 期望 ${digits.take(13)} 实得 $actual"
+        }
+    }
+
+    /**
+     * 流水 56 位数据解析（**切分待标签实样校准**）：时间 = 前 10 位 `yyMMddHHmm` 可确定性
+     * 解析；重量/单价/金额字段切分确认后补充。时间非法（如秤端时间未同步）置 null。
+     */
+    private fun parseTradeData(recordNo: Int, data: String): TradeRecord {
+        val yy = data.take(2).toIntOrNull()
+        val month = data.substring(2, 4).toIntOrNull()
+        val day = data.substring(4, 6).toIntOrNull()
+        val hour = data.substring(6, 8).toIntOrNull()
+        val minute = data.substring(8, 10).toIntOrNull()
+        val timestamp = if (yy != null && month != null && day != null && hour != null && minute != null) {
+            kotlinx.datetime.LocalDateTime(2000 + yy, month, day, hour, minute)
+        } else {
+            null
+        }
+        return TradeRecord(
+            deviceId = device.id,
+            recordNo = recordNo.toLong(),
+            timestamp = timestamp,
+        )
+    }
+
+    /** 单连接串行请求会话：发一帧读至 ETX（或超时），ASCII 文本返回。 */
+    private class Session(private val socket: Socket) : AutoCloseable {
+        private val out = socket.getOutputStream()
+        private val inp = socket.getInputStream()
+
+        /** 发请求并读至 ETX；无应答（超时零字节）返回 null，部分数据交解析层校验前缀。 */
+        fun request(frame: ByteArray): String? {
+            out.apply { write(frame); flush() }
+            val buf = ByteArray(MAX_RESPONSE)
+            var total = 0
+            try {
+                socket.soTimeout = READ_TIMEOUT_MS
+                while (total < buf.size) {
+                    val n = inp.read(buf, total, buf.size - total)
+                    if (n <= 0) break
+                    total += n
+                    if (buf[total - 1] == ETX_BYTE) break
+                }
+            } catch (_: SocketTimeoutException) {
+                if (total == 0) return null
+            }
+            if (total == 0) return null
+            return String(buf, 0, total, Charsets.US_ASCII)
+        }
+
+        override fun close() {
+            socket.close()
+        }
+
+        private companion object {
+            const val MAX_RESPONSE = 4096
+            const val ETX_BYTE: Byte = 0x03
+        }
+    }
+
+    private fun session(): Session = Socket().apply {
+        tcpNoDelay = true
+        connect(InetSocketAddress(device.ip, targetPort), CONNECT_TIMEOUT_MS)
+        soTimeout = READ_TIMEOUT_MS
+    }.let { Session(it) }
 
     private companion object {
         const val CONNECT_TIMEOUT_MS = 3000
         const val READ_TIMEOUT_MS = 2500
 
-        /** 校时 ACK 帧长：`0p\r\n` + ETX(0x03) = 5B。 */
-        const val ACK_SIZE = 5
+        /** 默认店号（秤端店名表 01 号）。 */
+        const val DEFAULT_SHOP_NO = 1
+
+        /** 流水扫描上界（逐条查询直到 `c` 结束标志；上限兜底防死循环）。 */
+        const val TRADE_SCAN_MAX = 5000
+
+        /** 下发后回读重试间隔（秤端写盘异步生效，真机实测立即回读读到旧值）。 */
+        const val WRITE_SETTLE_MS = 400L
     }
-
-    override suspend fun readTradeLog(): Result<List<TradeRecord>> = withContext(Dispatchers.IO) {
-        runCatching {
-            // Request trade log (protocol specific)
-            transport.send("!0VTRADELOG\r\n".toByteArray(Charsets.US_ASCII))
-            // Parse response (format: IP timestamp PLU weight price amount)
-            emptyList() // Placeholder - needs field capture for full parsing
-        }
-    }
-
-    override suspend fun clearTradeLog(): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            transport.send("!0VCLEARTRADE\r\n".toByteArray(Charsets.US_ASCII))
-            Unit
-        }
-    }
-
-    override suspend fun uploadPlu(): Result<List<PluItem>> =
-        Result.failure(UnsupportedOperationException("Dahua uploadPlu pending field capture"))
-
-    override suspend fun downloadLabelTemplate(template: LabelTemplate): Result<Unit> =
-        Result.failure(UnsupportedOperationException("Dahua label download pending field capture"))
 }
