@@ -35,19 +35,15 @@ class ConfigService(db: Database) {
             barcodeFormat = (g("barcodeFormat", "0")).toIntOrNull() ?: 0,
             mtApiDllPath = g("mtApiDllPath", ""),
             digiToolsPath = g("digiToolsPath", ""),
-            dahuaToolsPath = g("dahuaToolsPath", ""),
             aclasToolsPath = g("aclasToolsPath", ""),
             mtScaleManagerPath = g("mtScaleManagerPath", ""),
         )
-        // 启动时同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS / 大华 DhScalePluNet / 顶尖 AclasSDK）
+        // 启动时同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS / 顶尖 AclasSDK）
         if (config.mtApiDllPath.isNotBlank()) {
             System.setProperty("scaleplex.mt.dll", config.mtApiDllPath)
         }
         if (config.digiToolsPath.isNotBlank()) {
             System.setProperty("scaleplex.digi.tools", config.digiToolsPath)
-        }
-        if (config.dahuaToolsPath.isNotBlank()) {
-            System.setProperty("scaleplex.dahua.tools", config.dahuaToolsPath)
         }
         if (config.aclasToolsPath.isNotBlank()) {
             System.setProperty("scaleplex.aclas.tools", config.aclasToolsPath)
@@ -73,18 +69,14 @@ class ConfigService(db: Database) {
         dao.put("barcodeFormat", cfg.barcodeFormat.toString())
         dao.put("mtApiDllPath", cfg.mtApiDllPath)
         dao.put("digiToolsPath", cfg.digiToolsPath)
-        dao.put("dahuaToolsPath", cfg.dahuaToolsPath)
         dao.put("aclasToolsPath", cfg.aclasToolsPath)
         dao.put("mtScaleManagerPath", cfg.mtScaleManagerPath)
-        // 同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS / 大华 DhScalePluNet / 顶尖 AclasSDK）
+        // 同步官方工具链路径（托利多 MTScaleKey / 寺冈 TWS / 顶尖 AclasSDK）
         if (cfg.mtApiDllPath.isNotBlank()) {
             System.setProperty("scaleplex.mt.dll", cfg.mtApiDllPath)
         }
         if (cfg.digiToolsPath.isNotBlank()) {
             System.setProperty("scaleplex.digi.tools", cfg.digiToolsPath)
-        }
-        if (cfg.dahuaToolsPath.isNotBlank()) {
-            System.setProperty("scaleplex.dahua.tools", cfg.dahuaToolsPath)
         }
         if (cfg.aclasToolsPath.isNotBlank()) {
             System.setProperty("scaleplex.aclas.tools", cfg.aclasToolsPath)

@@ -216,13 +216,6 @@ fun SettingsPanel(state: AppState, refresh: MutableState<Int>) {
                         selectDirectory = true,
                     )
                     ToolDirRow(
-                        label = tr("settings.dahuaTools"),
-                        value = cfg.dahuaToolsPath,
-                        hint = tr("settings.dahuaToolsHint"),
-                        onChange = { cfg = cfg.copy(dahuaToolsPath = it) },
-                        selectDirectory = true,
-                    )
-                    ToolDirRow(
                         label = tr("settings.aclasTools"),
                         value = cfg.aclasToolsPath,
                         hint = tr("settings.aclasToolsHint"),

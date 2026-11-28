@@ -4,7 +4,7 @@ import com.scaleplex.core.model.ScaleBrand
 import com.scaleplex.driver.api.ScaleDriverFactory
 import com.scaleplex.driver.impl.aclas.AclasDriver
 import com.scaleplex.driver.impl.cas.CasClDriver
-import com.scaleplex.driver.impl.dahua.DahuaDriver
+import com.scaleplex.driver.impl.dahua.DahuaTcpDriver
 import com.scaleplex.driver.impl.digi.DigiSmDriver
 import com.scaleplex.driver.impl.hihong.HiHongUdpDriver
 import com.scaleplex.driver.impl.mettler.MettlerToledoDriver
@@ -25,7 +25,7 @@ object DriverRegistry {
         synchronized(this) {
             if (installed) return
             ScaleDriverFactory.register(ScaleBrand.DIGI) { device -> DigiSmDriver(device) }
-            ScaleDriverFactory.register(ScaleBrand.DAHUA) { device -> DahuaDriver(device) }
+            ScaleDriverFactory.register(ScaleBrand.DAHUA) { device -> DahuaTcpDriver(device) }
             ScaleDriverFactory.register(ScaleBrand.YOUSHENG) { device -> YouShengDriver(device) }
             ScaleDriverFactory.register(ScaleBrand.HIHONG) { device -> HiHongUdpDriver(device) }
             ScaleDriverFactory.register(ScaleBrand.METTLER_TOLEDO) { device -> MettlerToledoDriver(device) }

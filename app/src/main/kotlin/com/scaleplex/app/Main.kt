@@ -95,7 +95,6 @@ private fun usable(dir: File): Boolean = try {
 private fun applyToolDefaults(config: ScaleConfig, toolsDir: File): ScaleConfig {
     val defaults = config.copy(
         digiToolsPath = config.digiToolsPath.ifBlank { existingDir(File(toolsDir, "digi")) },
-        dahuaToolsPath = config.dahuaToolsPath.ifBlank { existingDir(File(toolsDir, "dahua")) },
         aclasToolsPath = config.aclasToolsPath.ifBlank { existingDir(File(toolsDir, "aclas")) },
         mtApiDllPath = config.mtApiDllPath.ifBlank {
             File(toolsDir, "mettler/MTScaleAPI.dll").takeIf { it.isFile }?.absolutePath ?: ""
@@ -107,9 +106,6 @@ private fun applyToolDefaults(config: ScaleConfig, toolsDir: File): ScaleConfig 
     // 同步给驱动桥接（与系统设置保存后的行为一致）
     if (defaults.digiToolsPath.isNotBlank()) {
         System.setProperty("scaleplex.digi.tools", defaults.digiToolsPath)
-    }
-    if (defaults.dahuaToolsPath.isNotBlank()) {
-        System.setProperty("scaleplex.dahua.tools", defaults.dahuaToolsPath)
     }
     if (defaults.aclasToolsPath.isNotBlank()) {
         System.setProperty("scaleplex.aclas.tools", defaults.aclasToolsPath)
