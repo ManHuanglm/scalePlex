@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -72,6 +73,7 @@ import com.scaleplex.core.model.BatchResult
 import com.scaleplex.core.model.DeviceStatus
 import com.scaleplex.core.model.PluItem
 import com.scaleplex.core.model.PluUnit
+import com.scaleplex.core.model.ScaleBrand
 import com.scaleplex.core.model.ScaleDevice
 import com.scaleplex.core.model.ShelfLifeUnit
 import com.scaleplex.core.util.Numbers
@@ -780,9 +782,10 @@ private fun RecallDevicesDialog(state: AppState, onDismiss: () -> Unit, onDone: 
             for (dev in targets) {
                 state.scaleService.driverFor(dev).uploadPlu().fold(
                     onSuccess = { items ->
-                        state.pluService.saveAll(items)
-                        byScale.add(dev to items)
+                        // 大华：不自动入库，进入导入选择视图由用户决定覆盖/增量导入
+                        if (dev.brand != ScaleBrand.DAHUA) state.pluService.saveAll(items)
                         total += items.size
+                        byScale.add(dev to items)
                     },
                     onFailure = { failures.add("${dev.name}（${deviceAddress(dev)}）：${it.message ?: "error"}") },
                 )
@@ -792,10 +795,31 @@ private fun RecallDevicesDialog(state: AppState, onDismiss: () -> Unit, onDone: 
         }
     }
 
+    /** 大华回收导入：覆盖 = 清空本地商品库再写入；增量 = upsert 合并。 */
+    fun importDahua(picked: List<PluItem>, overwrite: Boolean) {
+        busy = true
+        scope.launch {
+            if (overwrite) state.pluService.deleteAll()
+            state.pluService.saveAll(picked)
+            busy = false
+            onDone(picked.size)
+        }
+    }
+
     val done = outcome
+    // 回收结果中含大华秤数据 → 进入导入选择视图（表格多选 + 覆盖/增量/重试/取消）
+    val hasDahuaPick = done?.byScale?.any { it.first.brand == ScaleBrand.DAHUA } == true
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text(if (done == null) tr("plu.recall.title") else tr("plu.recall.result")) },
+        title = {
+            Text(
+                when {
+                    done == null -> tr("plu.recall.title")
+                    hasDahuaPick -> tr("plu.recall.pick.title")
+                    else -> tr("plu.recall.result")
+                },
+            )
+        },
         text = {
             if (done == null) {
                 Column(modifier = Modifier.width(420.dp)) {
@@ -834,17 +858,26 @@ private fun RecallDevicesDialog(state: AppState, onDismiss: () -> Unit, onDone: 
                         )
                     }
                 }
+            } else if (hasDahuaPick) {
+                DahuaImportView(
+                    state = state,
+                    outcome = done,
+                    busy = busy,
+                    onImport = { picked, overwrite -> importDahua(picked, overwrite) },
+                    onRetry = { outcome = null },
+                    onCancel = onDismiss,
+                )
             } else {
                 RecallResultView(state, done)
             }
         },
         confirmButton = {
-            if (done == null) {
-                Button(onClick = { startRecall() }, enabled = devices.isNotEmpty() && !busy) {
+            when {
+                done == null -> Button(onClick = { startRecall() }, enabled = devices.isNotEmpty() && !busy) {
                     Text(tr("plu.recall.start"))
                 }
-            } else {
-                Button(onClick = { onDone(done.total) }) { Text(tr("common.close")) }
+                hasDahuaPick -> {} // 操作按钮在 DahuaImportView 内
+                else -> Button(onClick = { onDone(done.total) }) { Text(tr("common.close")) }
             }
         },
         dismissButton = {
@@ -957,5 +990,120 @@ private fun RecallResultView(state: AppState, outcome: RecallOutcome) {
             color = UiColors.Success,
             modifier = Modifier.padding(top = 8.dp),
         )
+    }
+}
+
+/**
+ * 大华回收导入视图：表格多选回收到的商品（默认全选，整行点击切换勾选），
+ * 覆盖导入 = 清空本地商品库后写入选中项；增量导入 = upsert 合并；
+ * 重试 = 丢弃本次结果重新回收；取消 = 退出不做任何导入。
+ */
+@Composable
+private fun DahuaImportView(
+    state: AppState,
+    outcome: RecallOutcome,
+    busy: Boolean,
+    onImport: (List<PluItem>, Boolean) -> Unit,
+    onRetry: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val flat = remember(outcome) { outcome.byScale.flatMap { (dev, items) -> items.map { dev to it } } }
+    var picked by remember(outcome) { mutableStateOf(flat.indices.toSet()) }
+
+    Column(modifier = Modifier.width(560.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
+            TextButton(onClick = { picked = flat.indices.toSet() }, enabled = !busy) {
+                Text(tr("plu.recall.selectAll"), fontSize = 12.sp)
+            }
+            TextButton(onClick = { picked = emptySet() }, enabled = !busy) {
+                Text(tr("plu.recall.selectNone"), fontSize = 12.sp)
+            }
+            Spacer(Modifier.weight(1f))
+            Text(
+                "${tr("plu.recall.picked")} ${picked.size}/${flat.size}",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            )
+        }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+            Spacer(Modifier.width(36.dp))
+            Text(tr("plu.recall.device"), Modifier.width(110.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text(tr("plu.field.pluNo"), Modifier.width(56.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text(tr("plu.field.name"), Modifier.weight(1f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text(tr("plu.field.price"), Modifier.width(72.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text(tr("plu.field.code"), Modifier.width(96.dp), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        }
+        LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
+            items(flat.size) { i ->
+                val (dev, p) = flat[i]
+                val checked = i in picked
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !busy) { picked = if (checked) picked - i else picked + i }
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = checked,
+                        onCheckedChange = { picked = if (it) picked + i else picked - i },
+                        enabled = !busy,
+                    )
+                    Text(
+                        dev.name.ifBlank { deviceAddress(dev) },
+                        Modifier.width(110.dp),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(p.pluNo.toString(), Modifier.width(56.dp), fontSize = 12.sp)
+                    Text(
+                        p.displayName.ifBlank { "-" },
+                        Modifier.weight(1f),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        Numbers.minorToDisplay(p.unitPrice, state.config.priceDecimals),
+                        Modifier.width(72.dp),
+                        fontSize = 12.sp,
+                    )
+                    Text(
+                        p.eanCode.ifBlank { "-" },
+                        Modifier.width(96.dp),
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        outcome.failures.forEach { f ->
+            Text(f, fontSize = 12.sp, color = UiColors.Error, modifier = Modifier.padding(vertical = 2.dp))
+        }
+        if (busy) {
+            Text(
+                tr("plu.recall.importing"),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TextButton(onClick = onCancel, enabled = !busy) { Text(tr("plu.recall.cancel")) }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onRetry, enabled = !busy) { Text(tr("plu.recall.retry")) }
+            OutlinedButton(
+                onClick = { onImport(picked.map { flat[it].second }, false) },
+                enabled = !busy && picked.isNotEmpty(),
+            ) { Text(tr("plu.recall.merge")) }
+            Button(
+                onClick = { onImport(picked.map { flat[it].second }, true) },
+                enabled = !busy && picked.isNotEmpty(),
+            ) { Text(tr("plu.recall.cover")) }
+        }
     }
 }

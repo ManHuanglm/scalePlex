@@ -25,8 +25,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  * 大华 TMA_07 条码秤 TCP 驱动（真机抓包标定 2026-11-28 @192.168.0.150:4001）。
  *
  * 协议为 ASCII 文本帧（CRLF 结尾，秤端应答以 ETX 0x03 结尾），帧编解码见 [DahuaProto]：
- * - PLU 下发 `!0V{号}A{73位数字段}{条码段}`，应答 `0v{号}a{n}`（**ACK 不区分成败，
- *   必须回读验证**——单价/代码为 0 的记录秤端拒写但 ACK 照回）；
+ * - PLU 下发 `!0V{号}A{73位数字段}{条码段}`，应答 `0v{号}a{n}`（**ACK 不区分成败**，
+ *   单价/代码为 0 的记录秤端拒写但 ACK 照回，由 encodeDigits 前置校验拦截）；
  * - PLU 回收 `!0U{号}A`，应答 `0u{号}A{数据}` / `0u{号}Anoplu`（空槽）；
  * - 流水回收 `!0J{记录}A`，结束标志 `0j{号}ac`；`!0HA` = 清空已回收流水；
  * - 校时 `!0P{yyMMddHHmm}`，ACK `0p`；标签格式表 `!0L{页}A{23×4位格式号}`。
@@ -89,13 +89,14 @@ class DahuaTcpDriver(
 
     override suspend fun downloadPlu(plu: PluItem): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            withSession { ses -> writePluVerified(ses, plu) }
+            withSession { ses -> writePluOnce(ses, plu) }
         }
     }
 
     /**
-     * PLU 批量下发：**每条独立连接**——`!0V` 写入后回读，某条超时后迟到的应答会残留
-     * 在连接里污染后续帧（真机实测），独立连接保证失败不跨条传染。
+     * PLU 批量一次性下发：转换 TMA07 格式后逐条写帧（`!0V` + ACK 前缀校验），
+     * **不逐条回读验证**——每条独立连接执行（超时残留不跨条传染）。
+     * ACK 不区分写入成败，无效记录（单价 0 等）由 [DahuaProto.encodeDigits] 前置拒绝。
      */
     override suspend fun downloadPluBatch(list: List<PluItem>): Result<BatchResult> = withContext(Dispatchers.IO) {
         runCatching {
@@ -103,7 +104,7 @@ class DahuaTcpDriver(
             val errors = mutableListOf<BatchError>()
             for (plu in list) {
                 try {
-                    withSession { ses -> writePluVerified(ses, plu) }
+                    withSession { ses -> writePluOnce(ses, plu) }
                     success++
                 } catch (t: Throwable) {
                     errors += BatchError(device.id, plu.pluNo, t.message ?: "error")
@@ -217,34 +218,14 @@ class DahuaTcpDriver(
     }
 
     /**
-     * 单条下发 + 回读验证：`!0V` 写入后回读 `!0U`，对比商品代码与单价一致才算成功
-     * （ACK 无法区分成败，秤端对无效记录拒写但 ACK 照回）。
+     * 一次性下发单条：`!0V` 写帧 + ACK 前缀校验（不回读验证）。
      */
-    private fun writePluVerified(ses: Session, plu: PluItem) {
+    private fun writePluOnce(ses: Session, plu: PluItem) {
         val digits = DahuaProto.encodeDigits(plu, shopNo = DEFAULT_SHOP_NO)
-        val segment = DahuaProto.barcodeSegment(plu.eanCode)
-        val ack = ses.request(DahuaProto.pluWriteFrame(plu.pluNo, digits, segment))
+        val ack = ses.request(DahuaProto.pluWriteFrame(plu.pluNo, digits, DahuaProto.barcodeSegment(plu.eanCode)))
             ?: error("大华下发无应答 (PLU ${plu.pluNo})")
         check(ack.startsWith("0v" + "%04d".format(plu.pluNo) + "a")) {
             "大华下发烧录应答异常 (PLU ${plu.pluNo}): $ack"
-        }
-        // 写入异步生效：ACK 后立即回读会读到旧值（真机实测），延迟后重试最多 3 次
-        var actual: String? = null
-        var matched = false
-        repeat(3) {
-            if (matched) return@repeat
-            Thread.sleep(WRITE_SETTLE_MS)
-            val readback = ses.request(DahuaProto.pluQueryFrame(plu.pluNo))
-                ?: error("大华回读无应答 (PLU ${plu.pluNo})")
-            val p = DahuaProto.parsePluResponse(readback, plu.pluNo)
-            if (p != null && p.digits.take(13) == digits.take(13)) {
-                matched = true
-            } else {
-                actual = p?.digits?.take(13) ?: "空槽"
-            }
-        }
-        check(matched) {
-            "大华下发回读不一致 (PLU ${plu.pluNo}): 期望 ${digits.take(13)} 实得 $actual"
         }
     }
 
@@ -317,8 +298,5 @@ class DahuaTcpDriver(
 
         /** 流水扫描上界（逐条查询直到 `c` 结束标志；上限兜底防死循环）。 */
         const val TRADE_SCAN_MAX = 5000
-
-        /** 下发后回读重试间隔（秤端写盘异步生效，真机实测立即回读读到旧值）。 */
-        const val WRITE_SETTLE_MS = 400L
     }
 }
