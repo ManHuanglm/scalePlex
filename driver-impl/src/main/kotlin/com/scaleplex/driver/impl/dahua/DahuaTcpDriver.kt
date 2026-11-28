@@ -173,8 +173,7 @@ class DahuaTcpDriver(
 
     /**
      * 流水回收：`!0J{记录}A` 逐条读取至 `0j{no}ac` 结束；**不发 `!0H`**（流水保留在秤上）。
-     * 记录数据 56 位定长（时间 10 + 部门 2 + 店号 2 + PLU 4 + 重量/金额字段），
-     * 重量/金额字段切分待标签实样对照校准（见 [parseTradeData]）。
+     * 数据段字段表已真机标定（时间/店号/PLU/重量/单价/总价，见 [DahuaProto.parseTradeData]）。
      */
     override suspend fun readTradeLog(): Result<List<TradeRecord>> = withContext(Dispatchers.IO) {
         runCatching {
@@ -235,26 +234,10 @@ class DahuaTcpDriver(
     }
 
     /**
-     * 流水 56 位数据解析（**切分待标签实样校准**）：时间 = 前 10 位 `yyMMddHHmm` 可确定性
-     * 解析；重量/单价/金额字段切分确认后补充。时间非法（如秤端时间未同步）置 null。
+     * 流水数据解析委托 [DahuaProto.parseTradeData]（字段表见该注释）。
      */
-    private fun parseTradeData(recordNo: Int, data: String): TradeRecord {
-        val yy = data.take(2).toIntOrNull()
-        val month = data.substring(2, 4).toIntOrNull()
-        val day = data.substring(4, 6).toIntOrNull()
-        val hour = data.substring(6, 8).toIntOrNull()
-        val minute = data.substring(8, 10).toIntOrNull()
-        val timestamp = if (yy != null && month != null && day != null && hour != null && minute != null) {
-            kotlinx.datetime.LocalDateTime(2000 + yy, month, day, hour, minute)
-        } else {
-            null
-        }
-        return TradeRecord(
-            deviceId = device.id,
-            recordNo = recordNo.toLong(),
-            timestamp = timestamp,
-        )
-    }
+    private fun parseTradeData(recordNo: Int, data: String): TradeRecord =
+        DahuaProto.parseTradeData(device.id, recordNo, data)
 
     /** 单连接串行请求会话：发一帧读至 ETX（或超时），ASCII 文本返回。 */
     private class Session(private val socket: Socket) : AutoCloseable {

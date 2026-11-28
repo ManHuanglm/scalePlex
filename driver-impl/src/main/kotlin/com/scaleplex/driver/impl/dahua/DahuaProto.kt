@@ -124,6 +124,43 @@ internal object DahuaProto {
     fun barcodeSegment(eanCode: String): String =
         if (eanCode.isBlank()) "B00C00D00E" else "B" + eanCode.trim() + "CDE"
 
+    /**
+     * 流水数据解析（真机标定 2026-11-28，3 条标签实样逐位 diff 对齐）：
+     * - [0:10]  时间 yy MM dd HH mm（**月份≥10 时秤端显示 0x10+m 的十进制**：11月→27、
+     *   10月→26，解码 >16 则 -16）；
+     * - [10:14] 店号（秤端编码原样）；[14:18] PLU 号；
+     * - [18:24] 重量（0.1g 单位，1.000kg→010000 → g = 值/10）；
+     * - [24:30] 单价（0.1 分单位，20.00 元→020000 → 分 = 值/10）；
+     * - [30:36] 总价（**分粒度直接**：20.00→002000=2000 分，10.50→001050=1050 分）；
+     *   [36:42] 折前总价（角粒度：10.50→000105）不映射；
+     * - [42:48] 未确认字段（样本 J1=002000 J2/J3=000020）不映射；
+     * - [48:54] 秤端内部序号（无语义）忽略；尾部 = 秤号 + `bc` 帧尾标志。
+     */
+    fun parseTradeData(deviceId: Long, recordNo: Int, data: String): com.scaleplex.core.model.TradeRecord {
+        val d = data.padEnd(54, '0')
+        val yy = d.substring(0, 2).toIntOrNull() ?: 0
+        val monthRaw = d.substring(2, 4).toIntOrNull() ?: 0
+        val month = if (monthRaw > 16) monthRaw - 16 else monthRaw
+        val day = d.substring(4, 6).toIntOrNull() ?: 0
+        val hour = d.substring(6, 8).toIntOrNull() ?: 0
+        val minute = d.substring(8, 10).toIntOrNull() ?: 0
+        val timestamp = if (month in 1..12 && day in 1..31 && hour in 0..23 && minute in 0..59) {
+            kotlinx.datetime.LocalDateTime(2000 + yy, month, day, hour, minute)
+        } else {
+            null // 秤端时间未同步/字段异常
+        }
+        return com.scaleplex.core.model.TradeRecord(
+            deviceId = deviceId,
+            recordNo = recordNo.toLong(),
+            timestamp = timestamp,
+            pluNo = d.substring(14, 18).toIntOrNull() ?: 0,
+            weight = ((d.substring(18, 24).toLongOrNull() ?: 0L) / 10).toInt(), // 0.1g → g
+            unitPrice = (d.substring(24, 30).toLongOrNull() ?: 0L) / 10, // 0.1 分 → 分
+            amount = d.substring(30, 36).toLongOrNull() ?: 0L, // 分粒度直接
+            operator = d.substring(10, 14),
+        )
+    }
+
     private fun plu4(no: Int): String = "%04d".format(no.coerceIn(1, PLU_NO_MAX))
 
     data class ParsedPlu(val digits: String, val barcodeSegment: String)

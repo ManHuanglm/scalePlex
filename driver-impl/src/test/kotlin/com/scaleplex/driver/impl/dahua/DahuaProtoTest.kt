@@ -109,10 +109,45 @@ class DahuaProtoTest {
 
     @Test
     fun `parse trade response`() {
-        val data = "26263009480003000101000002000000200000020000000200553701bc"
+        val data = "2627281039000300010100000200000020000002000000200553701bc"
         assertEquals(data, DahuaProto.parseTradeResponse("0j0001a$data\r\n\u0003", 1))
         // 结束标志：0j0001ac
         assertNull(DahuaProto.parseTradeResponse("0j0001ac\r\n\u0003", 1))
+    }
+
+    /** 真机流水样本（2026-11-28 10:39 三张标签，与 TMA 软件流水列表逐值对照）。 */
+    @Test
+    fun `parse trade data real samples`() {
+        // J1: PLU1 重量 1.000kg 单价 20.00 总价 20.00
+        val j1 = DahuaProto.parseTradeData(
+            1, 1,
+            "2627281039000300010100000200000020000002000000200553701bc",
+        )
+        assertEquals(1, j1.pluNo)
+        assertEquals(1000, j1.weight) // 1.000kg
+        assertEquals(2000L, j1.unitPrice) // 20.00 元
+        assertEquals(2000L, j1.amount)
+        assertEquals(2026, j1.timestamp!!.year)
+        assertEquals(11, j1.timestamp!!.monthNumber) // 27 → 11 月（0x10+m 编码）
+        assertEquals(28, j1.timestamp!!.dayOfMonth)
+        assertEquals(10, j1.timestamp!!.hour)
+        assertEquals(39, j1.timestamp!!.minute)
+        // J2: PLU2 1.000kg 10.50/10.50
+        val j2 = DahuaProto.parseTradeData(
+            1, 2,
+            "26272810390002000201000001050000105000010500000200107401bc",
+        )
+        assertEquals(2, j2.pluNo)
+        assertEquals(1050L, j2.unitPrice)
+        assertEquals(1050L, j2.amount)
+        // J3: PLU9 1.000kg 90.00/90.00
+        val j3 = DahuaProto.parseTradeData(
+            1, 3,
+            "26272810390001000901000009000000900000090000000200661101bc",
+        )
+        assertEquals(9, j3.pluNo)
+        assertEquals(9000L, j3.unitPrice)
+        assertEquals(9000L, j3.amount)
     }
 
     @Test
