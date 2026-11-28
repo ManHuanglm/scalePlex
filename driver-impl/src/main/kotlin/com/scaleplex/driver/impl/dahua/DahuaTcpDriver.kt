@@ -19,6 +19,7 @@ import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 大华 TMA_07 条码秤 TCP 驱动（真机抓包标定 2026-11-28 @192.168.0.150:4001）。
@@ -35,6 +36,10 @@ import java.util.Locale
  *
  * 不走 transport.request：其读循环等对端 EOF 才返回，而秤保持连接会读到超时误判，
  * 全部改用驱动内裸 Socket（读至 ETX）。
+ *
+ * **秤端连接行为（真机实测）**：会话活跃期间拒绝一切新 TCP 连接，且外来连接会
+ * 干扰秤端处理导致应答迟到（>2.5s 超时）。因此操作互斥（[busy]：操作期间心跳
+ * getStatus 直接视为在线），批量下发每条独立连接避免超时残留污染后续帧。
  */
 class DahuaTcpDriver(
     private val device: ScaleDevice,
@@ -47,6 +52,13 @@ class DahuaTcpDriver(
 ) : AbstractScaleDriver() {
 
     override val brand: ScaleBrand = ScaleBrand.DAHUA
+
+    /**
+     * 操作互斥标志：大华秤在下发/回收会话活跃期间**拒绝一切新 TCP 连接**
+     * （真机实测：会话进行中心跳探测 connect 全部失败），且外来连接会干扰秤端
+     * 处理导致应答迟到超时。操作进行中 getStatus 直接视为在线，不连秤。
+     */
+    private val busy = AtomicBoolean(false)
 
     /** 大华 PLU 版本（TMA_07 = 3），历史配置存于 device.note。 */
     private val pluVersion: Int = device.note.toIntOrNull() ?: 3
@@ -63,6 +75,9 @@ class DahuaTcpDriver(
 
     override suspend fun getStatus(): Result<ScaleStatus> = withContext(Dispatchers.IO) {
         runCatching {
+            // 下发/回收会话进行中：秤端拒绝新连接（真机实测），直接视为在线，
+            // 避免心跳 connect 干扰会话且被误报离线
+            if (busy.get()) return@runCatching ScaleStatus(online = true, model = device.model)
             // TCP 4001 端口探测：4001 为大华条码秤专用通讯口；无安全的查询帧可用
             //（校时帧 !0P 会改秤时间不可用于探测），连接成功即在线。
             Socket().use { s ->
@@ -74,28 +89,27 @@ class DahuaTcpDriver(
 
     override suspend fun downloadPlu(plu: PluItem): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            session().use { ses -> writePluVerified(ses, plu) }
+            withSession { ses -> writePluVerified(ses, plu) }
         }
     }
 
     /**
-     * PLU 批量下发：`!0V` 帧 + ACK + 回读验证（ACK 不区分成败，见类注释）。
+     * PLU 批量下发：**每条独立连接**——`!0V` 写入后回读，某条超时后迟到的应答会残留
+     * 在连接里污染后续帧（真机实测），独立连接保证失败不跨条传染。
      */
     override suspend fun downloadPluBatch(list: List<PluItem>): Result<BatchResult> = withContext(Dispatchers.IO) {
         runCatching {
-            session().use { ses ->
-                var success = 0
-                val errors = mutableListOf<BatchError>()
-                for (plu in list) {
-                    try {
-                        writePluVerified(ses, plu)
-                        success++
-                    } catch (t: Throwable) {
-                        errors += BatchError(device.id, plu.pluNo, t.message ?: "error")
-                    }
+            var success = 0
+            val errors = mutableListOf<BatchError>()
+            for (plu in list) {
+                try {
+                    withSession { ses -> writePluVerified(ses, plu) }
+                    success++
+                } catch (t: Throwable) {
+                    errors += BatchError(device.id, plu.pluNo, t.message ?: "error")
                 }
-                BatchResult(total = list.size, success = success, failed = list.size - success, errors = errors)
             }
+            BatchResult(total = list.size, success = success, failed = list.size - success, errors = errors)
         }
     }
 
@@ -116,7 +130,7 @@ class DahuaTcpDriver(
      */
     override suspend fun syncTime(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            session().use { ses ->
+            withSession { ses ->
                 val resp = ses.request(timeFrame(Date()))
                     ?: error("大华校时无应答")
                 check(resp.startsWith("0p")) { "大华校时应答异常: $resp" }
@@ -130,7 +144,7 @@ class DahuaTcpDriver(
      */
     override suspend fun uploadPlu(): Result<List<PluItem>> = withContext(Dispatchers.IO) {
         runCatching {
-            session().use { ses ->
+            withSession { ses ->
                 val items = mutableListOf<PluItem>()
                 for (no in 1..DahuaProto.UPLOAD_SCAN_MAX) {
                     val resp = ses.request(DahuaProto.pluQueryFrame(no))
@@ -161,7 +175,7 @@ class DahuaTcpDriver(
             check(template.id in 1..DahuaProto.LABEL_TABLE_SIZE) {
                 "大华标签格式号须在 1~${DahuaProto.LABEL_TABLE_SIZE}（当前 ${template.id}）"
             }
-            session().use { ses ->
+            withSession { ses ->
                 for (frame in DahuaProto.labelTableFrames()) {
                     val resp = ses.request(frame)
                         ?: error("大华标签格式下发无应答")
@@ -177,7 +191,7 @@ class DahuaTcpDriver(
      */
     override suspend fun readTradeLog(): Result<List<TradeRecord>> = withContext(Dispatchers.IO) {
         runCatching {
-            session().use { ses ->
+            withSession { ses ->
                 val records = mutableListOf<TradeRecord>()
                 for (no in 1..TRADE_SCAN_MAX) {
                     val resp = ses.request(DahuaProto.tradeQueryFrame(no))
@@ -194,7 +208,7 @@ class DahuaTcpDriver(
     /** 流水清空：`!0HA`（回收结束确认帧，秤端清空全部流水）。 */
     override suspend fun clearTradeLog(): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            session().use { ses ->
+            withSession { ses ->
                 val resp = ses.request(DahuaProto.tradeClearFrame())
                     ?: error("大华清流水无应答")
                 check(resp.startsWith("0h")) { "大华清流水应答异常: $resp" }
@@ -218,6 +232,7 @@ class DahuaTcpDriver(
         var actual: String? = null
         var matched = false
         repeat(3) {
+            if (matched) return@repeat
             Thread.sleep(WRITE_SETTLE_MS)
             val readback = ses.request(DahuaProto.pluQueryFrame(plu.pluNo))
                 ?: error("大华回读无应答 (PLU ${plu.pluNo})")
@@ -271,6 +286,19 @@ class DahuaTcpDriver(
         private companion object {
             const val MAX_RESPONSE = 4096
             const val ETX_BYTE: Byte = 0x03
+        }
+    }
+
+    /**
+     * 互斥会话执行：同一时刻只允许一个操作连接秤（会话期间秤端拒绝其他连接），
+     * busy 期间心跳 getStatus 视为在线。
+     */
+    private fun <T> withSession(block: (Session) -> T): T {
+        check(busy.compareAndSet(false, true)) { "大华秤操作进行中，请稍后再试" }
+        try {
+            session().use { return block(it) }
+        } finally {
+            busy.set(false)
         }
     }
 
