@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.scaleplex.app.AppState
+import com.scaleplex.app.ui.DevicePickDialog
 import com.scaleplex.app.ui.BatchResultDialog
 import com.scaleplex.core.i18n.tr
 import com.scaleplex.core.model.BatchResult
@@ -90,6 +91,7 @@ fun LabelEditorDialog(
     var oneToOne by remember { mutableStateOf(false) }
     var snap by remember { mutableStateOf(true) }
     var showPreview by remember { mutableStateOf(false) }
+    var showPick by remember { mutableStateOf(false) }
     var batchResults by remember { mutableStateOf<Map<Long, BatchResult>?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -178,13 +180,9 @@ fun LabelEditorDialog(
                     OutlinedButton(onClick = {
                         importJson()?.let { imported -> template = imported; selected = null }
                     }) { Text(tr("label.importJson")) }
-                    Button(enabled = template.system.canDownloadTemplate, onClick = {
-                        scope.launch {
-                            batchResults = state.scaleService.downloadLabelToDevices(
-                                state.scaleService.devices().filter { it.enabled }, template,
-                            )
-                        }
-                    }) { Text(tr("label.download")) }
+                    Button(enabled = template.system.canDownloadTemplate, onClick = { showPick = true }) {
+                        Text(tr("label.download"))
+                    }
                     Spacer(Modifier.weight(1f))
                     OutlinedButton(onClick = onDismiss) { Text(tr("common.close")) }
                 }
@@ -314,6 +312,21 @@ fun LabelEditorDialog(
 
     batchResults?.let { results ->
         BatchResultDialog(state, results, onDismiss = { batchResults = null })
+    }
+
+    if (showPick) {
+        DevicePickDialog(
+            state = state,
+            title = tr("label.download"),
+            startLabel = tr("pick.start"),
+            onDismiss = { showPick = false },
+            onConfirm = { targets ->
+                showPick = false
+                scope.launch {
+                    batchResults = state.scaleService.downloadLabelToDevices(targets, template)
+                }
+            },
+        )
     }
 }
 

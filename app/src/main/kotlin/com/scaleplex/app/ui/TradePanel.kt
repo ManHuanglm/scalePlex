@@ -55,6 +55,8 @@ fun TradePanel(state: AppState, refresh: MutableState<Int>) {
     var filterFrom by remember { mutableStateOf("") }
     var filterTo by remember { mutableStateOf("") }
     var filterPlu by remember { mutableStateOf("") }
+    var showPickDialog by remember { mutableStateOf(false) }
+    var reading by remember { mutableStateOf(false) }
 
     var records by remember(refresh.value, filterDevice, filterFrom, filterTo, filterPlu) {
         mutableStateOf(
@@ -95,15 +97,9 @@ fun TradePanel(state: AppState, refresh: MutableState<Int>) {
                     )
                 }
             }) { Text(tr("trade.export")) }
-            Button(onClick = {
-                scope.launch {
-                    state.scaleService.devices().forEach { dev ->
-                        val res = state.scaleService.driverFor(dev).readTradeLog()
-                        res.getOrNull()?.let { state.tradeLogService.store(dev.id, it) }
-                    }
-                    records = state.tradeLogService.query(pageSize = 500)
-                }
-            }) { Text(tr("trade.read")) }
+            Button(enabled = !reading, onClick = { showPickDialog = true }) {
+                Text(if (reading) tr("trade.reading") else tr("trade.read"))
+            }
         }
 
         // ---- 筛选区 ----
@@ -186,6 +182,27 @@ fun TradePanel(state: AppState, refresh: MutableState<Int>) {
                 )
             }
         }
+    }
+
+    if (showPickDialog) {
+        DevicePickDialog(
+            state = state,
+            title = tr("trade.read"),
+            startLabel = tr("pick.start"),
+            onDismiss = { showPickDialog = false },
+            onConfirm = { targets ->
+                showPickDialog = false
+                scope.launch {
+                    reading = true
+                    for (dev in targets) {
+                        val res = state.scaleService.driverFor(dev).readTradeLog()
+                        res.getOrNull()?.let { state.tradeLogService.store(dev.id, it) }
+                    }
+                    records = state.tradeLogService.query(pageSize = 500)
+                    reading = false
+                }
+            },
+        )
     }
 }
 

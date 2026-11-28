@@ -959,39 +959,3 @@ private fun RecallResultView(state: AppState, outcome: RecallOutcome) {
         )
     }
 }
-
-/** 回收弹窗的可选行：单选圆点 + 名称 + 说明 + 可选在线状态点。 */
-@Composable
-private fun DevicePickRow(
-    label: String,
-    detail: String,
-    selected: Boolean,
-    enabled: Boolean,
-    onSelect: () -> Unit,
-    status: DeviceStatus? = null,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(4.dp))
-            .background(if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f) else Color.Transparent)
-            .clickable(enabled = enabled, onClick = onSelect)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        androidx.compose.material3.RadioButton(selected = selected, onClick = onSelect, enabled = enabled)
-        if (status != null) {
-            StatusDot(status)
-            Spacer(Modifier.width(6.dp))
-        }
-        Text(label, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.width(10.dp))
-        Text(
-            detail,
-            fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
